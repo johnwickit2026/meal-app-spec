@@ -191,14 +191,20 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(502).json({ error: 'Payment gateway unavailable. Please try again.' })
     }
 
-    const sslData = await sslResponse.json()
+    const sslData = await sslResponse.json() as {
+      status: string
+      GatewayPageURL?: string
+      sessionkey?: string
+      failedreason?: string
+      [key: string]: unknown
+    }
 
     if (sslData.status !== 'SUCCESS' || !sslData.GatewayPageURL) {
       console.error('SSLCommerz initiation failed:', sslData)
       return res.status(502).json({ error: 'Failed to initiate payment. Please try again.' })
     }
 
-    const sessionKey: string = sslData.sessionkey
+    const sessionKey: string = sslData.sessionkey ?? ''
 
     // Upsert payment record — if retrying, update the existing pending row
     const paymentRecord = {

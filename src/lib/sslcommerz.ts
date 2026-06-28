@@ -9,10 +9,16 @@
 
 // ─── Environment ──────────────────────────────────────────────────────────────
 
-const STORE_ID       = process.env.SSLCOMMERZ_STORE_ID       ?? ''
-const STORE_PASSWORD = process.env.SSLCOMMERZ_STORE_PASSWORD ?? ''
-const IS_LIVE        = process.env.SSLCOMMERZ_IS_LIVE === 'true'
-const APP_URL        = process.env.VITE_APP_URL               ?? 'http://localhost:5173'
+// Allow `process` reference to compile under Vite's client types (no @types/node)
+declare const process: { env: Record<string, string | undefined> } | undefined
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const _env: Record<string, string | undefined> = typeof process !== 'undefined' ? (process as any).env : (import.meta as any).env
+
+const STORE_ID       = _env.SSLCOMMERZ_STORE_ID       ?? ''
+const STORE_PASSWORD = _env.SSLCOMMERZ_STORE_PASSWORD ?? ''
+const IS_LIVE        = _env.SSLCOMMERZ_IS_LIVE === 'true'
+const APP_URL        = _env.VITE_APP_URL               ?? 'http://localhost:5173'
 
 // Gateway base URLs
 const SANDBOX_BASE  = 'https://sandbox.sslcommerz.com'

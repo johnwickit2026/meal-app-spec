@@ -403,6 +403,153 @@ export interface Database {
           }
         ]
       }
+      student_tiffin_menu: {
+        Row: {
+          id: string
+          meal_id: string
+          scheduled_date: string
+          time_slot: string
+          capacity: number
+          price: number
+          is_available: boolean
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          meal_id: string
+          scheduled_date: string
+          time_slot: string
+          capacity?: number
+          price?: number
+          is_available?: boolean
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          meal_id?: string
+          scheduled_date?: string
+          time_slot?: string
+          capacity?: number
+          price?: number
+          is_available?: boolean
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "student_tiffin_menu_meal_id_fkey"
+            columns: ["meal_id"]
+            referencedRelation: "meals"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
+      student_orders: {
+        Row: {
+          id: string
+          student_id: string
+          tiffin_menu_id: string
+          status: 'pending' | 'paid' | 'cancelled' | 'delivered'
+          quantity: number
+          total_amount: number
+          order_date: string
+          meal_date: string
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          student_id: string
+          tiffin_menu_id: string
+          status?: 'pending' | 'paid' | 'cancelled' | 'delivered'
+          quantity?: number
+          total_amount?: number
+          order_date?: string
+          meal_date: string
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          student_id?: string
+          tiffin_menu_id?: string
+          status?: 'pending' | 'paid' | 'cancelled' | 'delivered'
+          quantity?: number
+          total_amount?: number
+          order_date?: string
+          meal_date?: string
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "student_orders_student_id_fkey"
+            columns: ["student_id"]
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "student_orders_tiffin_menu_id_fkey"
+            columns: ["tiffin_menu_id"]
+            referencedRelation: "student_tiffin_menu"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
+      student_payments: {
+        Row: {
+          id: string
+          order_id: string
+          student_id: string
+          sslcommerz_session_key: string | null
+          tran_id: string | null
+          val_id: string | null
+          amount: number
+          currency: string
+          status: 'pending' | 'success' | 'failed' | 'cancelled'
+          payment_data: Json | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          order_id: string
+          student_id: string
+          sslcommerz_session_key?: string | null
+          tran_id?: string | null
+          val_id?: string | null
+          amount?: number
+          currency?: string
+          status?: 'pending' | 'success' | 'failed' | 'cancelled'
+          payment_data?: Json | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          order_id?: string
+          student_id?: string
+          sslcommerz_session_key?: string | null
+          tran_id?: string | null
+          val_id?: string | null
+          amount?: number
+          currency?: string
+          status?: 'pending' | 'success' | 'failed' | 'cancelled'
+          payment_data?: Json | null
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "student_payments_order_id_fkey"
+            columns: ["order_id"]
+            referencedRelation: "student_orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "student_payments_student_id_fkey"
+            columns: ["student_id"]
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
     }
     Views: {
       [_ in never]: never
@@ -438,6 +585,9 @@ export type Booking = Database['public']['Tables']['bookings']['Row']
 export type Notification = Database['public']['Tables']['notifications']['Row']
 export type Payment = Database['public']['Tables']['payments']['Row']
 export type AppSettings = Database['public']['Tables']['app_settings']['Row']
+export type StudentTiffinMenu = Database['public']['Tables']['student_tiffin_menu']['Row']
+export type StudentOrder = Database['public']['Tables']['student_orders']['Row']
+export type StudentPayment = Database['public']['Tables']['student_payments']['Row']
 
 // Extended types with relations
 export interface MenuScheduleWithMeal extends MenuSchedule {
@@ -498,3 +648,4 @@ export interface AdvancePaymentWithProfile extends AdvancePayment {
   profile?: Profile
   creator?: Profile
 }
+

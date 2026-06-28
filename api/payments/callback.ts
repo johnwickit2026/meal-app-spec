@@ -99,7 +99,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(502).json({ error: 'Payment validation service unavailable' })
     }
 
-    const validateData = await validateResponse.json()
+    const validateData = await validateResponse.json() as {
+      status: string
+      tran_id: string
+      amount: string
+      val_id: string
+      [key: string]: unknown
+    }
 
     // Determine the final status
     const isValid =

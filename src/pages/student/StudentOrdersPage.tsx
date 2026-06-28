@@ -15,7 +15,7 @@ import {
 } from 'lucide-react'
 import { useStudentStore } from '../../store/studentStore'
 import type { StudentOrder } from '../../store/studentStore'
-import { Card, CardContent, CardHeader, CardTitle, Button, Badge, CardSkeleton } from '../../components/ui'
+import { Card, CardContent, Button, Badge, CardSkeleton } from '../../components/ui'
 import { ConfirmDialog } from '../../components/ui/Modal'
 import toast from 'react-hot-toast'
 

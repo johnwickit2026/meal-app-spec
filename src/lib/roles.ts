@@ -93,8 +93,10 @@ export function canViewReports(profile: Profile | null): boolean {
  */
 export function hasMinimumRole(profile: Profile | null, requiredRole: UserRole): boolean {
   if (!profile) return false
+  // Student is deliberately excluded from the employee/admin hierarchy
+  if (profile.role === 'student') return false
   const userRoleIndex = ROLE_HIERARCHY.indexOf(profile.role)
-  const requiredRoleIndex = ROLE_HIERARCHY.indexOf(requiredRole)
+  const requiredRoleIndex = ROLE_HIERARCHY.indexOf(requiredRole as typeof ROLE_HIERARCHY[number])
   return userRoleIndex >= requiredRoleIndex
 }
 

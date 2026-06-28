@@ -7,7 +7,6 @@ import {
   ArrowRight,
   CheckCircle2,
   AlertCircle,
-  Loader2,
   Package,
   GraduationCap,
   CalendarDays,

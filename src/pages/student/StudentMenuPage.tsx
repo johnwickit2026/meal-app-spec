@@ -11,7 +11,7 @@ import {
 } from 'lucide-react'
 import { useStudentStore } from '../../store/studentStore'
 import type { TiffinMenuItem } from '../../store/studentStore'
-import { Card, CardContent, CardHeader, CardTitle, Button, Badge, CardSkeleton } from '../../components/ui'
+import { Card, CardContent, Button, Badge, CardSkeleton } from '../../components/ui'
 import toast from 'react-hot-toast'
 
 // ─── Meal Card ────────────────────────────────────────────────────────────────
