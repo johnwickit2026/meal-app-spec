@@ -113,7 +113,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (!validation.success) {
       return res.status(400).json({
         error: 'Invalid input',
-        details: (validation as { success: false; errors: { path: (string | number)[]; message: string }[] }).errors.map((e) => ({
+        details: validation.errors.map((e) => ({
           field: e.path.join('.'),
           message: e.message,
         })),

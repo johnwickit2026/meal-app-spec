@@ -120,7 +120,11 @@ export interface ValidationError {
   message: string
 }
 
-export function validateInput<T>(schema: z.ZodSchema<T>, data: unknown): { success: true; data: T } | { success: false; errors: ValidationError[] } {
+export type ValidationSuccess<T> = { success: true; data: T; errors?: never }
+export type ValidationFailure = { success: false; errors: ValidationError[]; data?: never }
+export type ValidationResult<T> = ValidationSuccess<T> | ValidationFailure
+
+export function validateInput<T>(schema: z.ZodSchema<T>, data: unknown): ValidationResult<T> {
   const result = schema.safeParse(data)
   if (result.success) {
     return { success: true, data: result.data }
