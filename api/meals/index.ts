@@ -1,8 +1,8 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { createClient } from '@supabase/supabase-js'
-import { getCache, setCache } from '../_cache'
-import { maskEmail } from '../_validation'
-import { checkRateLimit, RATE_LIMITS, getClientIP, logSecurityEvent } from '../_security'
+import { getCache, setCache } from '../_cache.js'
+import { maskEmail } from '../_validation.js'
+import { checkRateLimit, RATE_LIMITS, getClientIP, logSecurityEvent } from '../_security.js'
 
 const supabaseUrl = process.env.VITE_SUPABASE_URL
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
