@@ -43,6 +43,22 @@
   to = "/.netlify/functions/admin/student-menu/index"
   status = 200
 
+# ── Student routes ───────────────────────────────────────────────────────────
+[[redirects]]
+  from = "/api/student/menu"
+  to = "/.netlify/functions/student/menu"
+  status = 200
+
+[[redirects]]
+  from = "/api/student/orders/list"
+  to = "/.netlify/functions/student/orders/list"
+  status = 200
+
+[[redirects]]
+  from = "/api/student/orders/create"
+  to = "/.netlify/functions/student/orders/create"
+  status = 200
+
 # ── General API wildcard ──────────────────────────────────────────────────────
 [[redirects]]
   from = "/api/*"
