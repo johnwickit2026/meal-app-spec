@@ -1,4 +1,9 @@
-import type { VercelRequest } from '@vercel/node'
+/** Minimal request shape compatible with both the Vercel req shim and Netlify HandlerEvent */
+interface RequestLike {
+  headers: Record<string, string | string[] | undefined>
+  url?: string
+  method?: string
+}
 
 // ============================================
 // RATE LIMITING
@@ -122,11 +127,11 @@ function cleanupExpiredEntries(now: number): void {
 /**
  * Get client IP from request
  */
-export function getClientIP(req: VercelRequest): string {
+export function getClientIP(req: RequestLike): string {
   const forwarded = req.headers['x-forwarded-for']
   const ip = typeof forwarded === 'string' 
     ? forwarded.split(',')[0].trim() 
-    : req.socket?.remoteAddress || 'unknown'
+    : 'unknown' // socket not available in serverless environments
   return ip
 }
 
@@ -200,7 +205,7 @@ const MAX_LOG_BUFFER = 1000
  */
 export function logSecurityEvent(
   event: SecurityEventType,
-  req: VercelRequest,
+  req: RequestLike,
   options: {
     userId?: string
     email?: string

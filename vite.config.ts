@@ -93,6 +93,15 @@ export default defineConfig(({ mode }) => {
                     }
                   }
                 }
+
+                // e) Netlify-style fallback: 'item.ts' acts as a dynamic leaf handler
+                //    (convention used when [param].ts has been renamed to item.ts for Netlify)
+                if (rest.length === 0) {
+                  const itemFile = path.join(currentDir, 'item.ts')
+                  if (fs.existsSync(itemFile)) {
+                    return { filePath: itemFile, params: { ...params, id: head } }
+                  }
+                }
               }
 
               return null
@@ -121,12 +130,15 @@ export default defineConfig(({ mode }) => {
             try {
               // ── 4. Load the module via Vite SSR (hot-reloads on save) ──
               const mod = await server.ssrLoadModule(filePath)
-              const handlerFn = mod.default
+
+              // Prefer named 'handler' export (Netlify v1 style); fall back to default export
+              const isNetlifyStyle = typeof mod.handler === 'function'
+              const handlerFn = isNetlifyStyle ? mod.handler : mod.default
 
               if (typeof handlerFn !== 'function') {
                 res.statusCode = 500
                 res.setHeader('Content-Type', 'application/json')
-                res.end(JSON.stringify({ error: `API module at ${filePath} has no default export function` }))
+                res.end(JSON.stringify({ error: `API module at ${filePath} exports no callable handler` }))
                 return
               }
 
@@ -139,12 +151,6 @@ export default defineConfig(({ mode }) => {
               })
 
               const bodyText = rawBody.toString('utf-8')
-              let bodyJson: unknown = undefined
-              try {
-                if (bodyText) bodyJson = JSON.parse(bodyText)
-              } catch {
-                // not JSON — leave as undefined
-              }
 
               // ── 6. Parse query string ──
               const queryObj: Record<string, string | string[]> = {}
@@ -157,50 +163,40 @@ export default defineConfig(({ mode }) => {
 
               // ── 7. Detect handler style and call appropriately ──
               //
-              //  Style A — Web API:  export default async function handler(req: Request): Promise<Response>
-              //  Style B — Vercel:   export default async function handler(req: VercelRequest, res: VercelResponse)
+              //  Style A — Web API:   export default async function handler(req: Request): Promise<Response>
+              //  Style B — Netlify v1: export const handler: Handler = async (event, ctx) => HandlerResponse
               //
-              // Heuristic: if the function declares >= 2 parameters it's Vercel/Node style.
-              const isVercelStyle = handlerFn.length >= 2
+              if (isNetlifyStyle) {
+                // ── Style B: Netlify v1 ──
+                // Build a HandlerEvent-compatible object from the Node.js request
+                const queryStringParameters: Record<string, string> = {}
+                for (const [k, v] of Object.entries({ ...params, ...queryObj })) {
+                  queryStringParameters[k] = Array.isArray(v) ? v[0] : v
+                }
 
-              if (isVercelStyle) {
-                // ── Style B: Vercel/Node ──
-                // Augment IncomingMessage with VercelRequest fields
-                const vercelReq = Object.assign(req, {
-                  body: bodyJson,
-                  query: { ...params, ...queryObj },
-                  cookies: {} as Record<string, string>,
-                })
+                const netlifyEvent = {
+                  httpMethod: req.method || 'GET',
+                  headers: req.headers as Record<string, string>,
+                  body: bodyText || null,
+                  queryStringParameters,
+                  path: pathname,
+                  rawUrl: `http://localhost${req.url}`,
+                  rawQuery: rawUrl.split('?')[1] || '',
+                  isBase64Encoded: false,
+                  multiValueHeaders: {} as Record<string, string[]>,
+                  multiValueQueryStringParameters: null,
+                  pathParameters: params as Record<string, string>,
+                }
 
-                // Build a VercelResponse-compatible wrapper around ServerResponse
-                let statusCode = 200
-                const vercelRes = Object.assign(res, {
-                  status(code: number) {
-                    statusCode = code
-                    res.statusCode = code
-                    return vercelRes
-                  },
-                  json(data: unknown) {
-                    res.statusCode = statusCode
-                    if (!res.headersSent) {
-                      res.setHeader('Content-Type', 'application/json')
-                    }
-                    res.end(JSON.stringify(data))
-                    return vercelRes
-                  },
-                  send(data: unknown) {
-                    res.statusCode = statusCode
-                    if (typeof data === 'object' && data !== null) {
-                      if (!res.headersSent) res.setHeader('Content-Type', 'application/json')
-                      res.end(JSON.stringify(data))
-                    } else {
-                      res.end(String(data ?? ''))
-                    }
-                    return vercelRes
-                  },
-                })
+                const result = await handlerFn(netlifyEvent, {})
 
-                await handlerFn(vercelReq, vercelRes)
+                if (result && typeof result === 'object' && 'statusCode' in result) {
+                  res.statusCode = result.statusCode
+                  for (const [k, v] of Object.entries(result.headers ?? {})) {
+                    res.setHeader(k, v as string)
+                  }
+                  res.end(result.body || '')
+                }
               } else {
                 // ── Style A: Web API (Request → Response) ──
                 const url = `http://localhost${req.url}`

@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
-import type { VercelRequest, VercelResponse } from '@vercel/node'
+import type { Handler, HandlerEvent } from '@netlify/functions'
+import { createReqRes } from '../_netlify_shim.js'
 import { isAdmin as checkIsAdmin } from '../_utils.js'
 import { bookingHistoryQuerySchema, validateInput, maskEmail } from '../_validation.js'
 import { checkRateLimit, RATE_LIMITS, getClientIP, logSecurityEvent } from '../_security.js'
@@ -35,7 +36,8 @@ async function verifyTokenWithRole(token: string): Promise<{ user: any, role: Us
   return { user, role: profile?.role as UserRole }
 }
 
-export default async function handler(req: VercelRequest, res: VercelResponse) {
+export const handler: Handler = async (event: HandlerEvent) => {
+  const { req, res } = createReqRes(event)
   const origin = req.headers.origin
   const clientIP = getClientIP(req)
 

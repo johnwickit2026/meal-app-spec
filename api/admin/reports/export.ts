@@ -1,4 +1,5 @@
-import type { VercelRequest, VercelResponse } from '@vercel/node'
+import type { Handler, HandlerEvent } from '@netlify/functions'
+import { createReqRes } from '../../_netlify_shim.js'
 import { createClient } from '@supabase/supabase-js'
 
 const supabaseUrl = process.env.VITE_SUPABASE_URL
@@ -10,7 +11,8 @@ if (!supabaseUrl || !supabaseServiceKey) {
 
 const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
-export default async function handler(req: VercelRequest, res: VercelResponse) {
+export const handler: Handler = async (event: HandlerEvent) => {
+  const { req, res } = createReqRes(event)
   if (req.method !== 'GET') {
     return res.status(405).json({ error: 'Method not allowed' })
   }

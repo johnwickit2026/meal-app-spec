@@ -147,8 +147,8 @@ export default function MealRoutinePage() {
   const daysOfWeek = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
 
   return (
-    <div className="max-w-7xl mx-auto space-y-6">
-      <div className="flex justify-between items-center">
+    <div className="max-w-7xl mx-auto space-y-6 px-3 sm:px-4 lg:px-0">
+      <div className="flex flex-wrap justify-between items-center gap-3">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Meal Routines</h1>
           <p className="text-gray-500">Manage bulk meal schedules for weeks or months</p>
@@ -200,8 +200,8 @@ export default function MealRoutinePage() {
 
       {/* CREATE ROUTINE MODAL */}
       <Modal isOpen={isCreateOpen} onClose={() => setIsCreateOpen(false)} title="Create Meal Routine" size="xl">
-        <div className="space-y-6">
-          <div className="grid grid-cols-2 gap-4">
+        <div className="space-y-6 px-4 sm:px-6 py-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-1">
               <label className="text-sm font-medium">Routine Name</label>
               <Input value={newRoutine.name} onChange={e => setNewRoutine({...newRoutine, name: e.target.value})} placeholder="e.g., Summer Menu Plan" />
@@ -232,17 +232,19 @@ export default function MealRoutinePage() {
                     </div>
                     <div className="space-y-3">
                       {newItems.map((item, itemIdx) => item.day_of_week === idx && (
-                        <div key={itemIdx} className="flex items-center gap-3 bg-white p-3 rounded shadow-sm border border-gray-100">
-                          <Select className="flex-1" value={item.meal_id} onChange={e => updateRoutineItem(itemIdx, 'meal_id', e.target.value)}>
+                        <div key={itemIdx} className="flex flex-col sm:flex-row sm:items-center gap-2 bg-white p-3 rounded shadow-sm border border-gray-100">
+                          <Select className="flex-1 w-full sm:w-auto" value={item.meal_id} onChange={e => updateRoutineItem(itemIdx, 'meal_id', e.target.value)}>
                             {meals.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
                           </Select>
-                          <Input type="time" className="w-32" value={item.time_slot} onChange={e => updateRoutineItem(itemIdx, 'time_slot', e.target.value)} />
-                          <Select className="w-32" value={item.meal_type ?? 'both'} onChange={e => updateRoutineItem(itemIdx, 'meal_type', e.target.value)}>
-                            <option value="both">Both</option>
-                            <option value="employee">Employee</option>
-                            <option value="student">Student</option>
-                          </Select>
-                          <Button variant="ghost" onClick={() => removeRoutineItem(itemIdx)} className="text-red-500 hover:bg-red-50 p-2"><Trash2 className="h-4 w-4"/></Button>
+                          <div className="flex gap-2">
+                            <Input type="time" className="flex-1 sm:w-32" value={item.time_slot} onChange={e => updateRoutineItem(itemIdx, 'time_slot', e.target.value)} />
+                            <Select className="flex-1 sm:w-32" value={item.meal_type ?? 'both'} onChange={e => updateRoutineItem(itemIdx, 'meal_type', e.target.value)}>
+                              <option value="both">Both</option>
+                              <option value="employee">Employee</option>
+                              <option value="student">Student</option>
+                            </Select>
+                            <Button variant="ghost" onClick={() => removeRoutineItem(itemIdx)} className="text-red-500 hover:bg-red-50 p-2 shrink-0"><Trash2 className="h-4 w-4"/></Button>
+                          </div>
                         </div>
                       ))}
                     </div>
@@ -250,9 +252,9 @@ export default function MealRoutinePage() {
                 ))}
               </div>
             ) : (
-              <div className="grid grid-cols-7 gap-2">
+              <div className="grid grid-cols-4 sm:grid-cols-7 gap-1.5 sm:gap-2">
                 {Array.from({ length: 31 }).map((_, idx) => (
-                  <div key={idx} className="p-2 bg-gray-50 rounded border border-gray-200 text-center relative group min-h-[60px] flex flex-col justify-between">
+                  <div key={idx} className="p-1.5 sm:p-2 bg-gray-50 rounded border border-gray-200 text-center relative group min-h-[52px] sm:min-h-[60px] flex flex-col justify-between">
                     <span className="text-xs font-semibold text-gray-500">{idx + 1}</span>
                     <button 
                       onClick={() => addRoutineItem(idx + 1)}
@@ -274,25 +276,27 @@ export default function MealRoutinePage() {
               <div className="mt-6 space-y-3">
                 <h4 className="font-medium text-gray-700">Monthly Meals Configured</h4>
                 {newItems.map((item, itemIdx) => (
-                  <div key={itemIdx} className="flex items-center gap-3 bg-white p-3 rounded shadow-sm border border-gray-200">
-                    <div className="w-16 font-semibold text-gray-700">Day {item.day_of_month}</div>
-                    <Select className="flex-1" value={item.meal_id} onChange={e => updateRoutineItem(itemIdx, 'meal_id', e.target.value)}>
+                  <div key={itemIdx} className="flex flex-col sm:flex-row sm:items-center gap-2 bg-white p-3 rounded shadow-sm border border-gray-200">
+                    <div className="w-full sm:w-16 font-semibold text-gray-700 text-sm">Day {item.day_of_month}</div>
+                    <Select className="flex-1 w-full sm:w-auto" value={item.meal_id} onChange={e => updateRoutineItem(itemIdx, 'meal_id', e.target.value)}>
                       {meals.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
                     </Select>
-                    <Input type="time" className="w-32" value={item.time_slot} onChange={e => updateRoutineItem(itemIdx, 'time_slot', e.target.value)} />
-                    <Select className="w-32" value={item.meal_type ?? 'both'} onChange={e => updateRoutineItem(itemIdx, 'meal_type', e.target.value)}>
-                      <option value="both">Both</option>
-                      <option value="employee">Employee</option>
-                      <option value="student">Student</option>
-                    </Select>
-                    <Button variant="ghost" onClick={() => removeRoutineItem(itemIdx)} className="text-red-500 hover:bg-red-50 p-2"><Trash2 className="h-4 w-4"/></Button>
+                    <div className="flex gap-2">
+                      <Input type="time" className="flex-1 sm:w-32" value={item.time_slot} onChange={e => updateRoutineItem(itemIdx, 'time_slot', e.target.value)} />
+                      <Select className="flex-1 sm:w-32" value={item.meal_type ?? 'both'} onChange={e => updateRoutineItem(itemIdx, 'meal_type', e.target.value)}>
+                        <option value="both">Both</option>
+                        <option value="employee">Employee</option>
+                        <option value="student">Student</option>
+                      </Select>
+                      <Button variant="ghost" onClick={() => removeRoutineItem(itemIdx)} className="text-red-500 hover:bg-red-50 p-2 shrink-0"><Trash2 className="h-4 w-4"/></Button>
+                    </div>
                   </div>
                 ))}
               </div>
             )}
           </div>
 
-          <div className="flex justify-end gap-3 pt-6">
+          <div className="flex justify-end gap-3 pt-6 px-4 sm:px-0 pb-1">
             <Button variant="outline" onClick={() => setIsCreateOpen(false)}>Cancel</Button>
             <Button onClick={handleCreateRoutine} disabled={newItems.length === 0}>Save Routine</Button>
           </div>
@@ -302,20 +306,22 @@ export default function MealRoutinePage() {
       {/* APPLY ROUTINE MODAL */}
       <Modal isOpen={isApplyOpen} onClose={() => setIsApplyOpen(false)} title="Apply Meal Routine" size="md">
         {selectedRoutine && (
-          <div className="space-y-6">
-            <div className="p-4 bg-primary-50 text-primary-900 rounded-lg">
+          <div className="space-y-5 px-4 sm:px-6 py-4">
+            <div className="p-3 bg-primary-50 text-primary-900 rounded-lg">
               <p className="font-medium">Applying: {selectedRoutine.name}</p>
               <p className="text-sm opacity-80">{selectedRoutine.items?.length || 0} meals configured</p>
             </div>
             
             <div className="space-y-4">
-              <div className="space-y-1">
-                <label className="text-sm font-medium">Start Date</label>
-                <Input type="date" value={applyForm.startDate} onChange={e => setApplyForm({...applyForm, startDate: e.target.value})} />
-              </div>
-              <div className="space-y-1">
-                <label className="text-sm font-medium">End Date</label>
-                <Input type="date" value={applyForm.endDate} onChange={e => setApplyForm({...applyForm, endDate: e.target.value})} />
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <label className="text-sm font-medium">Start Date</label>
+                  <Input type="date" value={applyForm.startDate} onChange={e => setApplyForm({...applyForm, startDate: e.target.value})} />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-sm font-medium">End Date</label>
+                  <Input type="date" value={applyForm.endDate} onChange={e => setApplyForm({...applyForm, endDate: e.target.value})} />
+                </div>
               </div>
               <div className="space-y-1">
                 <label className="text-sm font-medium">Apply To Audience</label>
@@ -327,7 +333,7 @@ export default function MealRoutinePage() {
               </div>
             </div>
 
-            <div className="flex justify-end gap-3 pt-6 border-t">
+            <div className="flex justify-end gap-3 pt-4 border-t">
               <Button variant="outline" onClick={() => setIsApplyOpen(false)}>Cancel</Button>
               <Button onClick={handleApplyRoutine} className="flex items-center gap-2">
                 <Play className="h-4 w-4" /> Generate Schedule

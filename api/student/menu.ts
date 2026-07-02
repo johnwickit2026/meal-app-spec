@@ -1,4 +1,5 @@
-import type { VercelRequest, VercelResponse } from '@vercel/node'
+import type { Handler, HandlerEvent } from '@netlify/functions'
+import { createReqRes } from '../_netlify_shim.js'
 import { createClient } from '@supabase/supabase-js'
 import { checkRateLimit, RATE_LIMITS, getClientIP, logSecurityEvent } from '../_security.js'
 import { maskEmail } from '../_validation.js'
@@ -43,7 +44,8 @@ function computeDeadline(scheduledDate: string, timeSlot: string, deadlineHours:
   return new Date(mealTime.getTime() - deadlineHours * 60 * 60 * 1000)
 }
 
-export default async function handler(req: VercelRequest, res: VercelResponse) {
+export const handler: Handler = async (event: HandlerEvent) => {
+  const { req, res } = createReqRes(event)
   const origin = req.headers.origin
   const clientIP = getClientIP(req)
 
@@ -114,7 +116,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (profileError || !profile) {
       return res.status(401).json({ error: 'Profile not found' })
     }
-    if (profile.role !== 'student') {
+    // Resolve effective role: DB trigger may write 'employee' even when user signed up as 'student'.
+    // Mirror the frontend resolveProfileRole logic by checking user metadata as fallback.
+    const metadataRole = user.user_metadata?.role
+    const effectiveRole =
+      profile.role === 'employee' && metadataRole === 'student' ? 'student' : profile.role
+    if (effectiveRole !== 'student') {
       logSecurityEvent('FORBIDDEN_ACCESS', req, {
         userId: user.id,
         email: maskEmail(user.email || ''),

@@ -29,18 +29,18 @@ export function Modal({ isOpen, onClose, title, children, size = 'md' }: ModalPr
       />
       
       {/* Modal */}
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div className="fixed inset-0 z-50 flex items-start sm:items-center justify-center p-3 sm:p-4 overflow-y-auto">
         <div
           className={cn(
-            'bg-white rounded-xl shadow-xl w-full transform transition-all',
+            'bg-white rounded-xl shadow-xl w-full transform transition-all my-auto',
             sizes[size]
           )}
           onClick={(e) => e.stopPropagation()}
         >
           {/* Header */}
           {title && (
-            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
-              <h2 className="text-lg font-semibold text-gray-900">{title}</h2>
+            <div className="flex items-center justify-between px-4 sm:px-6 py-4 border-b border-gray-200 sticky top-0 bg-white rounded-t-xl z-10">
+              <h2 className="text-base sm:text-lg font-semibold text-gray-900">{title}</h2>
               <button
                 onClick={onClose}
                 className="p-1 rounded-lg text-gray-500 hover:text-gray-700 hover:bg-gray-100 transition-colors"
@@ -51,7 +51,7 @@ export function Modal({ isOpen, onClose, title, children, size = 'md' }: ModalPr
           )}
           
           {/* Content */}
-          <div className={cn(!title && 'relative')}>
+          <div className={cn('overflow-y-auto max-h-[calc(100vh-8rem)] sm:max-h-[calc(90vh-5rem)]', !title && 'relative')}>
             {!title && (
               <button
                 onClick={onClose}

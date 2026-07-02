@@ -1,4 +1,5 @@
-import type { VercelRequest, VercelResponse } from '@vercel/node'
+import type { Handler, HandlerEvent } from '@netlify/functions'
+import { createReqRes } from '../../_netlify_shim.js'
 import { createClient } from '@supabase/supabase-js'
 import { checkRateLimit, RATE_LIMITS, getClientIP, logSecurityEvent } from '../../_security.js'
 import { maskEmail } from '../../_validation.js'
@@ -37,7 +38,8 @@ function canManageMeals(role: UserRole): boolean {
   return ['admin', 'food_editor'].includes(role)
 }
 
-export default async function handler(req: VercelRequest, res: VercelResponse) {
+export const handler: Handler = async (event: HandlerEvent) => {
+  const { req, res } = createReqRes(event)
   const origin = req.headers.origin
   const clientIP = getClientIP(req)
 

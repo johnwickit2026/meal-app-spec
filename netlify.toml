@@ -1,0 +1,56 @@
+[build]
+  command = "npm run build"
+  publish = "dist"
+
+[functions]
+  directory = "api"
+  node_bundler = "esbuild"
+
+# ── Dynamic student-menu item: passes the path segment as ?id= ──────────────
+[[redirects]]
+  from = "/api/admin/student-menu/:id"
+  to = "/.netlify/functions/admin/student-menu/item?id=:id"
+  status = 200
+
+# ── Index-style routes (file is named index.ts; map without the /index suffix) ──
+[[redirects]]
+  from = "/api/meals"
+  to = "/.netlify/functions/meals/index"
+  status = 200
+
+[[redirects]]
+  from = "/api/bookings"
+  to = "/.netlify/functions/bookings/index"
+  status = 200
+
+[[redirects]]
+  from = "/api/notifications"
+  to = "/.netlify/functions/notifications/index"
+  status = 200
+
+[[redirects]]
+  from = "/api/admin/guest-meals"
+  to = "/.netlify/functions/admin/guest-meals/index"
+  status = 200
+
+[[redirects]]
+  from = "/api/admin/routines"
+  to = "/.netlify/functions/admin/routines/index"
+  status = 200
+
+[[redirects]]
+  from = "/api/admin/student-menu"
+  to = "/.netlify/functions/admin/student-menu/index"
+  status = 200
+
+# ── General API wildcard ──────────────────────────────────────────────────────
+[[redirects]]
+  from = "/api/*"
+  to = "/.netlify/functions/:splat"
+  status = 200
+
+# ── SPA fallback ──────────────────────────────────────────────────────────────
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
