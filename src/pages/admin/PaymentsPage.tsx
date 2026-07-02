@@ -48,6 +48,26 @@ export function PaymentsPage() {
     fetchCashRequests()
   }, [selectedMonth])
 
+  // ── Realtime: new/updated cash requests appear without manual refresh ────────
+  useEffect(() => {
+    const channel = supabase
+      .channel('payments_cash_requests')
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'cash_payment_requests' },
+        () => { fetchCashRequests() }
+      )
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'cash_payment_requests' },
+        () => { fetchCashRequests() }
+      )
+      .subscribe()
+
+    return () => { supabase.removeChannel(channel) }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   const fetchBills = async () => {
     setIsLoading(true)
     try {

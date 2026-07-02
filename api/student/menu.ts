@@ -14,11 +14,33 @@ const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
 const allowedOrigins = (process.env.ALLOWED_ORIGINS || 'http://localhost:5173').split(',').map(o => o.trim())
 
-/** Returns tomorrow's date as a YYYY-MM-DD string in UTC */
+/** Returns a YYYY-MM-DD string for today in UTC */
+function getTodayDate(): string {
+  return new Date().toISOString().slice(0, 10)
+}
+
+/** Returns a YYYY-MM-DD string for tomorrow in UTC */
 function getTomorrowDate(): string {
   const tomorrow = new Date()
   tomorrow.setUTCDate(tomorrow.getUTCDate() + 1)
   return tomorrow.toISOString().slice(0, 10)
+}
+
+/** Validates a YYYY-MM-DD string */
+function isValidDate(str: string): boolean {
+  return /^\d{4}-\d{2}-\d{2}$/.test(str) && !isNaN(Date.parse(str))
+}
+
+/**
+ * Compute the ordering deadline for a tiffin item.
+ * The deadline is `deadlineHours` hours before the time_slot on the scheduled_date.
+ * time_slot is expected as "HH:MM" or "HH:MM:SS" (24-hour UTC).
+ */
+function computeDeadline(scheduledDate: string, timeSlot: string, deadlineHours: number): Date {
+  // Parse "HH:MM" or "HH:MM:SS"
+  const [hh, mm] = (timeSlot || '00:00').split(':').map(Number)
+  const mealTime = new Date(`${scheduledDate}T${String(hh).padStart(2, '0')}:${String(mm || 0).padStart(2, '0')}:00Z`)
+  return new Date(mealTime.getTime() - deadlineHours * 60 * 60 * 1000)
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -102,9 +124,27 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(403).json({ error: 'Forbidden: Student access required' })
     }
 
+    // ── Date range resolution ──────────────────────────────────────────────────
+    // If a ?date=YYYY-MM-DD query param is provided, fetch only that single date.
+    // Otherwise, default to fetching both today AND tomorrow.
+    const today = getTodayDate()
     const tomorrow = getTomorrowDate()
 
-    // Fetch available tiffin menu items for tomorrow, joined with meal details
+    let fromDate: string
+    let toDate: string
+    let singleDateMode = false
+
+    const dateParam = req.query?.date
+    if (dateParam && typeof dateParam === 'string' && isValidDate(dateParam)) {
+      fromDate = dateParam
+      toDate = dateParam
+      singleDateMode = true
+    } else {
+      fromDate = today
+      toDate = tomorrow
+    }
+
+    // ── Supabase query ─────────────────────────────────────────────────────────
     const { data: menuItems, error: menuError } = await supabase
       .from('student_tiffin_menu')
       .select(`
@@ -115,6 +155,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         capacity,
         price,
         is_available,
+        ordering_deadline_hours,
         created_at,
         meal:meals (
           id,
@@ -125,24 +166,79 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           image_url
         )
       `)
-      .eq('scheduled_date', tomorrow)
+      .gte('scheduled_date', fromDate)
+      .lte('scheduled_date', toDate)
       .eq('is_available', true)
+      .order('scheduled_date', { ascending: true })
       .order('time_slot', { ascending: true })
 
     if (menuError) throw menuError
 
-    // Group items by time_slot
-    const grouped: Record<string, typeof menuItems> = {}
+    const now = new Date()
+
+    // ── Group by date → time_slot, with deadline awareness ────────────────────
+    // Structure: { [date]: { [time_slot]: TiffinMenuItem[] } }
+    const byDate: Record<string, Record<string, typeof menuItems>> = {}
+
     for (const item of menuItems || []) {
+      const date = item.scheduled_date as string
       const slot = item.time_slot as string
-      if (!grouped[slot]) grouped[slot] = []
-      grouped[slot].push(item)
+      const deadlineHours: number = (item.ordering_deadline_hours as number) ?? 1
+
+      const deadline = computeDeadline(date, slot, deadlineHours)
+      const deadlinePassed = now > deadline
+
+      // Augment the item with deadline metadata for the client
+      const enriched = {
+        ...item,
+        deadline_passed: deadlinePassed,
+        deadline_at: deadline.toISOString(),
+      }
+
+      if (!byDate[date]) byDate[date] = {}
+      if (!byDate[date][slot]) byDate[date][slot] = []
+      byDate[date][slot].push(enriched as any)
     }
 
+    // ── Build a summary per date ───────────────────────────────────────────────
+    // Each date entry carries: { slots: { [slot]: items[] }, total_items, has_open_slots }
+    const datesResult: Record<string, {
+      slots: Record<string, typeof menuItems>
+      total_items: number
+      has_open_slots: boolean
+      label: 'today' | 'tomorrow' | 'other'
+    }> = {}
+
+    for (const [date, slots] of Object.entries(byDate)) {
+      let totalItems = 0
+      let hasOpen = false
+      for (const items of Object.values(slots)) {
+        totalItems += items.length
+        if (items.some((it: any) => !it.deadline_passed)) hasOpen = true
+      }
+
+      let label: 'today' | 'tomorrow' | 'other' = 'other'
+      if (date === today) label = 'today'
+      else if (date === tomorrow) label = 'tomorrow'
+
+      datesResult[date] = {
+        slots,
+        total_items: totalItems,
+        has_open_slots: hasOpen,
+        label,
+      }
+    }
+
+    const totalItems = Object.values(datesResult).reduce((acc, d) => acc + d.total_items, 0)
+
     return res.status(200).json({
-      date: tomorrow,
-      menu: grouped,
-      total_items: menuItems?.length ?? 0,
+      // Legacy field kept for backwards-compat with old clients
+      date: singleDateMode ? fromDate : today,
+      // New grouped structure
+      dates: datesResult,
+      today,
+      tomorrow,
+      total_items: totalItems,
     })
   } catch (error) {
     console.error('Student menu fetch error:', error)

@@ -287,10 +287,6 @@ export function StudentTiffinPage() {
       toast.error('Please fill in all required fields')
       return
     }
-    if (form.scheduled_date < tomorrow()) {
-      toast.error('Scheduled date must be tomorrow or later')
-      return
-    }
 
     setIsSubmitting(true)
     try {
@@ -494,17 +490,17 @@ export function StudentTiffinPage() {
                           {format(new Date(payment.created_at), 'MMM d, h:mm a')}
                         </td>
                         <td className="px-4 py-3">
-                          <span
-                            className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
+                          <Badge
+                            variant={
                               payment.status === 'success' || payment.status === 'paid'
-                                ? 'bg-green-100 text-green-700'
+                                ? 'confirmed'
                                 : payment.status === 'failed' || payment.status === 'cancelled'
-                                ? 'bg-red-100 text-red-700'
-                                : 'bg-amber-100 text-amber-700'
-                            }`}
+                                ? 'cancelled'
+                                : 'pending'
+                            }
                           >
                             {payment.status.charAt(0).toUpperCase() + payment.status.slice(1)}
-                          </span>
+                          </Badge>
                         </td>
                       </tr>
                     )
@@ -532,6 +528,14 @@ export function StudentTiffinPage() {
               className="w-44"
             />
             <div className="flex gap-2">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setDateFilter(today())}
+                className={dateFilter === today() ? 'bg-blue-50 text-blue-700' : ''}
+              >
+                Today
+              </Button>
               <Button
                 variant="ghost"
                 size="sm"
@@ -643,17 +647,11 @@ export function StudentTiffinPage() {
 
                         {/* Orders count */}
                         <td className="px-4 py-3">
-                          <span
-                            className={`inline-flex items-center justify-center min-w-[2rem] h-8 px-2 rounded-full text-sm font-semibold ${
-                              isFull
-                                ? 'bg-red-100 text-red-700'
-                                : item.orders_count > 0
-                                ? 'bg-amber-100 text-amber-700'
-                                : 'bg-gray-100 text-gray-600'
-                            }`}
+                          <Badge
+                            variant={isFull ? 'danger' : item.orders_count > 0 ? 'warning' : 'default'}
                           >
                             {item.orders_count}
-                          </span>
+                          </Badge>
                           {isFull && (
                             <span className="ml-2 text-xs text-red-600 font-medium">Full</span>
                           )}
@@ -750,11 +748,10 @@ export function StudentTiffinPage() {
               <Input
                 type="date"
                 value={form.scheduled_date}
-                min={tomorrow()}
                 onChange={(e) => setForm((f) => ({ ...f, scheduled_date: e.target.value }))}
                 required
               />
-              <p className="text-xs text-gray-500 mt-1">Must be tomorrow or later (students order 1 day ahead)</p>
+              <p className="text-xs text-gray-500 mt-1">Same-day items appear on students' menu immediately.</p>
             </div>
 
             {/* Time slot */}

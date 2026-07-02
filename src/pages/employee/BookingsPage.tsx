@@ -47,11 +47,40 @@ export function BookingsPage() {
     if (!user || monthlyTotal <= 0) return
     setIsSubmittingPayNow(true)
     try {
+      // 1. Insert the cash payment request
       const { error } = await supabase.from('cash_payment_requests').insert({
         user_id: user.id,
-        amount: monthlyTotal
+        amount: monthlyTotal,
       })
       if (error) throw error
+
+      // 2. Notify every admin user so the bell lights up immediately
+      const { data: admins } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('role', 'admin')
+
+      if (admins && admins.length > 0) {
+        // Resolve the submitter's display name from their profile
+        const { data: submitterProfile } = await supabase
+          .from('profiles')
+          .select('full_name')
+          .eq('id', user.id)
+          .single()
+
+        const senderName = submitterProfile?.full_name || user.email || 'An employee'
+        const notifMessage = `${senderName} submitted a cash payment request for ৳${monthlyTotal.toFixed(0)}. Please review in Payments.`
+
+        await supabase.from('notifications').insert(
+          admins.map((admin) => ({
+            user_id: admin.id,
+            type: 'cash_request',
+            message: notifMessage,
+            is_read: false,
+          }))
+        )
+      }
+
       toast.success('Payment request submitted. Admin will confirm.')
       setPayNowModalOpen(false)
     } catch (err: any) {
@@ -65,11 +94,12 @@ export function BookingsPage() {
     if (!cancellingBookingId) return
     setIsCancelling(true)
     try {
-      await cancelBooking(cancellingBookingId)
+      const { error } = await cancelBooking(cancellingBookingId)
+      if (error) throw error
       toast.success(t('bookingCancelled') || 'Booking cancelled successfully')
       setCancellingBookingId(null)
-    } catch (error) {
-      toast.error('Failed to cancel booking')
+    } catch (error: any) {
+      toast.error(error?.message || 'Failed to cancel booking')
     } finally {
       setIsCancelling(false)
     }

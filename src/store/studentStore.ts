@@ -13,6 +13,10 @@ export interface TiffinMenuItem {
   price: number
   is_available: boolean
   ordering_deadline_hours?: number
+  /** Populated by the API: true when the ordering window has closed */
+  deadline_passed?: boolean
+  /** ISO string of when ordering closes for this item */
+  deadline_at?: string
   created_at: string
   meal: {
     id: string
@@ -48,16 +52,42 @@ export interface StudentOrder {
   payment: StudentPaymentSummary | null
 }
 
+/** Flat: { [timeSlot]: items[] } — kept for legacy use */
 export interface StudentMenuGrouped {
   [timeSlot: string]: TiffinMenuItem[]
+}
+
+/** Per-date entry returned by the API */
+export interface StudentMenuDateEntry {
+  slots: StudentMenuGrouped
+  total_items: number
+  has_open_slots: boolean
+  label: 'today' | 'tomorrow' | 'other'
+}
+
+/** Full grouped response: { [YYYY-MM-DD]: StudentMenuDateEntry } */
+export interface StudentMenuByDate {
+  [date: string]: StudentMenuDateEntry
 }
 
 // ─── State ──────────────────────────────────────────────────────────────────
 
 interface StudentState {
   // Menu
+  /** Legacy flat slot map (first date's slots, or empty) — kept for backwards compatibility */
   menu: StudentMenuGrouped
+  /** Legacy single-date field */
   menuDate: string | null
+  /** Full grouped-by-date response from API */
+  menuDates: StudentMenuByDate
+  /** Convenience: today's slot map (may be empty) */
+  menuToday: StudentMenuGrouped
+  /** Convenience: tomorrow's slot map (may be empty) */
+  menuTomorrow: StudentMenuGrouped
+  /** Today's date string YYYY-MM-DD as returned by the API */
+  today: string | null
+  /** Tomorrow's date string YYYY-MM-DD as returned by the API */
+  tomorrow: string | null
   isLoadingMenu: boolean
 
   // Orders
@@ -87,6 +117,11 @@ async function getAuthHeader(): Promise<string | null> {
 export const useStudentStore = create<StudentState>((set, get) => ({
   menu: {},
   menuDate: null,
+  menuDates: {},
+  menuToday: {},
+  menuTomorrow: {},
+  today: null,
+  tomorrow: null,
   isLoadingMenu: false,
 
   orders: [],
@@ -109,11 +144,45 @@ export const useStudentStore = create<StudentState>((set, get) => ({
       }
       const data = await res.json()
       console.log('Student menu API response:', data)
-      set({ menu: data.menu ?? {}, menuDate: data.date ?? null })
+
+      // New grouped-by-date shape
+      const menuDates: StudentMenuByDate = data.dates ?? {}
+      const todayStr: string | null = data.today ?? null
+      const tomorrowStr: string | null = data.tomorrow ?? null
+
+      const menuToday: StudentMenuGrouped = todayStr && menuDates[todayStr]
+        ? menuDates[todayStr].slots
+        : {}
+      const menuTomorrow: StudentMenuGrouped = tomorrowStr && menuDates[tomorrowStr]
+        ? menuDates[tomorrowStr].slots
+        : {}
+
+      // Legacy compat: expose first available date's slots as `menu`
+      const firstDate = Object.keys(menuDates).sort()[0]
+      const legacyMenu: StudentMenuGrouped = firstDate ? menuDates[firstDate].slots : {}
+
+      set({
+        menuDates,
+        menuToday,
+        menuTomorrow,
+        today: todayStr,
+        tomorrow: tomorrowStr,
+        // legacy fields
+        menu: legacyMenu,
+        menuDate: data.date ?? todayStr,
+      })
     } catch (error) {
       console.error('fetchMenu error:', error)
-      // Store an empty menu on error so it shows "No tiffin scheduled" instead of hanging
-      set({ menu: {}, menuDate: null })
+      // Store empty menus on error so the UI shows "No tiffin scheduled"
+      set({
+        menuDates: {},
+        menuToday: {},
+        menuTomorrow: {},
+        menu: {},
+        menuDate: null,
+        today: null,
+        tomorrow: null,
+      })
     } finally {
       set({ isLoadingMenu: false })
     }

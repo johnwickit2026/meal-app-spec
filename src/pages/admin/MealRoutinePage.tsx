@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Plus, CalendarDays, Calendar as CalendarIcon, Repeat, Play, Trash2, Edit } from 'lucide-react'
-import { Card, CardContent, CardHeader, CardTitle, Button, Input, Modal, Select } from '../../components/ui'
+import { Card, CardContent, CardHeader, CardTitle, Button, Input, Modal, Select, Badge } from '../../components/ui'
 import { supabase } from '../../lib/supabaseClient'
 import toast from 'react-hot-toast'
 import type { MealRoutine, MealRoutineItem, Meal } from '../../types/database'
@@ -167,9 +167,9 @@ export default function MealRoutinePage() {
                   <CardTitle className="text-lg">{routine.name}</CardTitle>
                   <p className="text-sm text-gray-500 line-clamp-1">{routine.description}</p>
                 </div>
-                <span className={`px-2 py-1 text-xs rounded-full capitalize ${routine.routine_type === 'weekly' ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700'}`}>
+                <Badge variant={routine.routine_type === 'weekly' ? 'primary' : 'default'} className="capitalize">
                   {routine.routine_type}
-                </span>
+                </Badge>
               </div>
             </CardHeader>
             <CardContent className="pt-4 space-y-4">

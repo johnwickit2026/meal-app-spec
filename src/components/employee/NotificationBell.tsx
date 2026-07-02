@@ -47,6 +47,7 @@ export function NotificationBell() {
       payment_success: '🎉',
       new_payment: '💰',
       payment_pending: '⏳',
+      cash_request: '💵',
     }
     return icons[type] || '📬'
   }

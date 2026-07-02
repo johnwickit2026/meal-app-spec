@@ -15,6 +15,7 @@ const supabase = createClient(supabaseUrl, supabaseServiceKey)
 const allowedOrigins = (process.env.ALLOWED_ORIGINS || 'http://localhost:5173').split(',').map(o => o.trim())
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
+  console.log(`[cancel] ${req.method} /api/bookings/cancel — body:`, req.body)
   const origin = req.headers.origin
   const clientIP = getClientIP(req)
 
@@ -96,8 +97,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     const { booking_id } = validation.data
 
+    // Determine if the caller is an admin (admins may cancel any booking)
+    const { data: callerProfile } = await supabase
+      .from('profiles')
+      .select('role')
+      .eq('id', user.id)
+      .single()
+    const isAdmin = callerProfile?.role === 'admin'
+
     // Get booking with schedule details
-    const { data: booking, error: bookingError } = await supabase
+    let bookingQuery = supabase
       .from('bookings')
       .select(`
         *,
@@ -107,8 +116,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         )
       `)
       .eq('id', booking_id)
-      .eq('user_id', user.id)
-      .single()
+
+    // Non-admins can only cancel their own bookings
+    if (!isAdmin) {
+      bookingQuery = bookingQuery.eq('user_id', user.id)
+    }
+
+    const { data: booking, error: bookingError } = await bookingQuery.single()
 
     if (bookingError || !booking) {
       return res.status(404).json({ error: 'Booking not found' })

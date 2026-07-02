@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import {
   CalendarDays,
   Clock,
@@ -6,7 +7,8 @@ import {
   XCircle,
   AlertTriangle,
   Users,
-  UtensilsCrossed
+  UtensilsCrossed,
+  Banknote,
 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle, Button, StatusBadge, CardSkeleton } from '../../components/ui'
 import { useBookingStore, useAuthStore } from '../../store'
@@ -34,14 +36,46 @@ interface MealBoardSlot {
 }
 
 export function AdminDashboardPage() {
+  const navigate = useNavigate()
   const { bookings, fetchAllBookings, updateBookingStatus, isLoading } = useBookingStore()
   const { profile } = useAuthStore()
   const [stats, setStats] = useState<DashboardStats | null>(null)
   const [mealBoard, setMealBoard] = useState<MealBoardSlot[]>([])
   const [loadingStats, setLoadingStats] = useState(true)
+  const [pendingCashCount, setPendingCashCount] = useState(0)
   const canApproveBookings = canManageBookings(profile)
 
   const today = format(new Date(), 'yyyy-MM-dd')
+
+  // ── Pending cash requests: initial fetch + Realtime subscription ────────────
+  useEffect(() => {
+    const fetchCashCount = async () => {
+      const { count } = await supabase
+        .from('cash_payment_requests')
+        .select('id', { count: 'exact', head: true })
+        .eq('status', 'pending')
+      setPendingCashCount(count ?? 0)
+    }
+    fetchCashCount()
+
+    // Subscribe to live INSERT events on cash_payment_requests
+    const channel = supabase
+      .channel('dashboard_cash_requests')
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'cash_payment_requests' },
+        () => { setPendingCashCount((c) => c + 1) }
+      )
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'cash_payment_requests' },
+        // Re-fetch count whenever a request is confirmed/rejected
+        () => { fetchCashCount() }
+      )
+      .subscribe()
+
+    return () => { supabase.removeChannel(channel) }
+  }, [])
 
   useEffect(() => {
     fetchAllBookings()
@@ -209,6 +243,38 @@ export function AdminDashboardPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Pending Cash Requests — live counter card */}
+      <button
+        onClick={() => navigate('/admin/payments')}
+        className="w-full text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 rounded-xl"
+        aria-label="View pending cash payment requests"
+      >
+        <Card className={`transition-all duration-200 hover:shadow-md border-2 ${
+          pendingCashCount > 0 ? 'border-emerald-400 bg-emerald-50' : 'border-gray-200'
+        }`}>
+          <CardContent className="flex items-center gap-4 py-4">
+            <div className={`h-12 w-12 rounded-xl flex items-center justify-center ${
+              pendingCashCount > 0 ? 'bg-emerald-100' : 'bg-gray-100'
+            }`}>
+              <Banknote className={`h-6 w-6 ${
+                pendingCashCount > 0 ? 'text-emerald-600' : 'text-gray-400'
+              }`} />
+            </div>
+            <div className="flex-1">
+              <p className={`text-2xl font-bold ${
+                pendingCashCount > 0 ? 'text-emerald-700' : 'text-gray-900'
+              }`}>{pendingCashCount}</p>
+              <p className="text-sm text-gray-500">Pending Cash Requests</p>
+            </div>
+            {pendingCashCount > 0 && (
+              <span className="text-xs font-semibold text-emerald-700 bg-emerald-100 px-2 py-1 rounded-full animate-pulse">
+                Action needed
+              </span>
+            )}
+          </CardContent>
+        </Card>
+      </button>
 
       {/* Additional Stats */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

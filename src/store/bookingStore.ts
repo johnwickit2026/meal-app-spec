@@ -192,14 +192,22 @@ export const useBookingStore = create<BookingState>((set, get) => ({
 
   cancelBooking: async (bookingId: string) => {
     try {
-      const { error } = await supabase
-        .from('bookings')
-        .update({ status: 'cancelled' as const, updated_at: new Date().toISOString() })
-        .eq('id', bookingId)
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session?.access_token) return { error: new Error('Not authenticated') }
 
-      if (error) throw error
+      const res = await fetch('/api/bookings/cancel', {
+        method: 'PATCH',
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ booking_id: bookingId }),
+      })
 
-      // Update local state
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) return { error: new Error(data.error || `Cancel failed: ${res.status}`) }
+
+      // Update local state only after confirmed server update
       set((state) => ({
         bookings: state.bookings.map((b) =>
           b.id === bookingId ? { ...b, status: 'cancelled' } : b

@@ -110,11 +110,15 @@ function OrderRow({ order, onCancel, cancelling }: OrderRowProps) {
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-xs text-gray-500">Status</span>
-                <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${
-                  paymentStatusConfig[payment.status]?.color ?? 'text-gray-600 bg-gray-50'
-                }`}>
+                <Badge
+                  variant={
+                    payment.status === 'success'  ? 'confirmed' :
+                    payment.status === 'failed'   ? 'danger'    :
+                    payment.status === 'cancelled' ? 'cancelled' : 'pending'
+                  }
+                >
                   {paymentStatusConfig[payment.status]?.label ?? payment.status}
-                </span>
+                </Badge>
               </div>
               {payment.tran_id && (
                 <div className="flex items-center justify-between">

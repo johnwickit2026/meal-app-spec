@@ -8,9 +8,11 @@ import {
   Loader2,
   AlertCircle,
   ShoppingCart,
+  CalendarDays,
+  Lock,
 } from 'lucide-react'
 import { useStudentStore } from '../../store/studentStore'
-import type { TiffinMenuItem } from '../../store/studentStore'
+import type { TiffinMenuItem, StudentMenuGrouped } from '../../store/studentStore'
 import { Card, CardContent, Button, Badge, CardSkeleton } from '../../components/ui'
 import toast from 'react-hot-toast'
 import { getMealDeadline, formatTime } from '../../lib/utils'
@@ -26,42 +28,52 @@ interface TiffinCardProps {
 
 function TiffinCard({ item, isOrdered, onOrder, isOrdering }: TiffinCardProps) {
   const { meal, scheduled_date, time_slot, ordering_deadline_hours } = item
-  const capacityLeft = item.capacity // We could subtract booked count if the API returned it
+  const capacityLeft = item.capacity
 
+  // Use the deadline_passed flag from the API if available; otherwise compute locally.
   const deadline = getMealDeadline(scheduled_date, time_slot, ordering_deadline_hours || 1)
-  const isPastDeadline = new Date() > deadline
-  
-  // Format the deadline cleanly, e.g. "8:00 PM"
-  let deadlineStr = deadline.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
-  // If deadline is not today, add "yesterday" or similar context? The user said just time.
-  // We can just use the time.
+  const isPastDeadline = item.deadline_passed ?? (new Date() > deadline)
+
+  const deadlineStr = deadline.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
 
   return (
     <Card
       className={`transition-all duration-200 ${
-        isOrdered ? 'border-green-300 bg-green-50/50' : 'hover:border-amber-300 hover:shadow-md'
-      } ${isPastDeadline ? 'opacity-70' : ''}`}
+        isPastDeadline
+          ? 'opacity-60 border-gray-200 bg-gray-50/50'
+          : isOrdered
+          ? 'border-green-300 bg-green-50/50'
+          : 'hover:border-amber-300 hover:shadow-md'
+      }`}
     >
       <CardContent className="p-5">
-        {/* Meal type chip + time slot */}
+        {/* Meal type chip + time slot + closed badge */}
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2">
-            <span className="inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full bg-amber-100 text-amber-700">
+            <Badge className="gap-1 bg-amber-100 text-amber-700">
               <Clock className="h-3 w-3" />
               {formatTime(item.time_slot)}
-            </span>
+            </Badge>
             {meal?.meal_type && (
-              <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-600 capitalize">
+              <Badge variant="default" className="capitalize">
                 {meal.meal_type.replace('_', ' ')}
-              </span>
+              </Badge>
             )}
           </div>
-          {isOrdered && (
-            <Badge variant="confirmed">
-              <CheckCircle2 className="h-3 w-3 mr-1" />
-              Ordered
-            </Badge>
-          )}
+          <div className="flex items-center gap-1">
+            {isPastDeadline && (
+              <Badge variant="cancelled" className="gap-1">
+                <Lock className="h-3 w-3" />
+                Closed
+              </Badge>
+            )}
+            {isOrdered && !isPastDeadline && (
+              <Badge variant="confirmed">
+                <CheckCircle2 className="h-3 w-3 mr-1" />
+                Ordered
+              </Badge>
+            )}
+          </div>
         </div>
 
         {/* Meal name & description */}
@@ -94,25 +106,25 @@ function TiffinCard({ item, isOrdered, onOrder, isOrdering }: TiffinCardProps) {
         </div>
 
         {/* Action */}
-        {isOrdered ? (
+        {isPastDeadline ? (
+          <div className="mt-2 text-center py-2 rounded-lg bg-gray-100 text-gray-500 text-sm font-medium">
+            Ordering window closed at {deadlineStr}
+          </div>
+        ) : isOrdered ? (
           <div className="mt-2 text-center py-2 rounded-lg bg-green-100 text-green-700 text-sm font-medium">
             ✓ Already ordered for this slot
           </div>
         ) : (
           <div className="mt-2">
-            {!isPastDeadline && (
-              <p className="text-xs text-center text-amber-600 mb-2">
-                Orders close at {deadlineStr}
-              </p>
-            )}
+            <p className="text-xs text-center text-amber-600 mb-2">
+              Orders close at {deadlineStr}
+            </p>
             <Button
               onClick={onOrder}
-              disabled={isOrdering || isPastDeadline}
+              disabled={isOrdering}
               className="w-full bg-amber-500 hover:bg-amber-600 text-white border-0 disabled:opacity-60"
             >
-              {isPastDeadline ? (
-                'Deadline Passed'
-              ) : isOrdering ? (
+              {isOrdering ? (
                 <>
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                   Placing Order…
@@ -131,12 +143,107 @@ function TiffinCard({ item, isOrdered, onOrder, isOrdering }: TiffinCardProps) {
   )
 }
 
+// ─── Section (Today / Tomorrow) ───────────────────────────────────────────────
+
+interface MenuSectionProps {
+  title: string
+  subtitle: string
+  accentClass: string
+  slots: StudentMenuGrouped
+  orderedIds: Set<string>
+  orderingId: string | null
+  onOrder: (item: TiffinMenuItem) => void
+  emptyMessage: string
+}
+
+function MenuSection({
+  title,
+  subtitle,
+  accentClass,
+  slots,
+  orderedIds,
+  orderingId,
+  onOrder,
+  emptyMessage,
+}: MenuSectionProps) {
+  const timeSlots = Object.keys(slots).sort()
+  const totalItems = timeSlots.reduce((acc, s) => acc + slots[s].length, 0)
+
+  return (
+    <section>
+      {/* Section header */}
+      <div className={`flex items-center justify-between rounded-xl px-4 py-3 mb-4 ${accentClass}`}>
+        <div className="flex items-center gap-2">
+          <CalendarDays className="h-5 w-5" />
+          <div>
+            <h2 className="font-bold text-base leading-tight">{title}</h2>
+            <p className="text-xs opacity-75">{subtitle}</p>
+          </div>
+        </div>
+        <div className="text-right">
+          <p className="text-xl font-bold">{totalItems}</p>
+          <p className="text-xs opacity-75">item{totalItems !== 1 ? 's' : ''}</p>
+        </div>
+      </div>
+
+      {totalItems === 0 ? (
+        <Card>
+          <CardContent className="py-10 text-center">
+            <UtensilsCrossed className="h-12 w-12 text-gray-300 mx-auto mb-3" />
+            <p className="text-gray-500 font-medium">{emptyMessage}</p>
+            <p className="text-gray-400 text-sm mt-1">Check back later or contact your admin.</p>
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="space-y-6">
+          {timeSlots.map((slot) => (
+            <div key={slot}>
+              {/* Time slot heading */}
+              <div className="flex items-center gap-3 mb-3">
+                <div className="flex items-center gap-2 bg-amber-100 text-amber-700 px-3 py-1.5 rounded-lg">
+                  <Clock className="h-4 w-4" />
+                  <span className="font-semibold text-sm">{slot}</span>
+                </div>
+                <div className="flex-1 h-px bg-amber-100" />
+                <span className="text-xs text-gray-400">
+                  {slots[slot].length} item{slots[slot].length !== 1 ? 's' : ''}
+                </span>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                {slots[slot].map((item) => (
+                  <TiffinCard
+                    key={item.id}
+                    item={item}
+                    isOrdered={orderedIds.has(item.id)}
+                    onOrder={() => onOrder(item)}
+                    isOrdering={orderingId === item.id}
+                  />
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </section>
+  )
+}
+
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export function StudentMenuPage() {
   const navigate = useNavigate()
-  const { menu, menuDate, isLoadingMenu, fetchMenu, upcomingOrders, fetchOrders, createOrder } =
-    useStudentStore()
+  const {
+    menuToday,
+    menuTomorrow,
+    today,
+    tomorrow,
+    isLoadingMenu,
+    fetchMenu,
+    upcomingOrders,
+    fetchOrders,
+    createOrder,
+  } = useStudentStore()
 
   const [orderingId, setOrderingId] = useState<string | null>(null)
 
@@ -152,8 +259,9 @@ export function StudentMenuPage() {
       .map((o) => o.tiffin_menu_id)
   )
 
-  const timeSlots = Object.keys(menu).sort()
-  const totalItems = timeSlots.reduce((acc, slot) => acc + menu[slot].length, 0)
+  const totalItems =
+    Object.values(menuToday).reduce((a, s) => a + s.length, 0) +
+    Object.values(menuTomorrow).reduce((a, s) => a + s.length, 0)
 
   const handleOrder = async (item: TiffinMenuItem) => {
     setOrderingId(item.id)
@@ -169,10 +277,10 @@ export function StudentMenuPage() {
     setOrderingId(null)
   }
 
-  // Console log for debugging
+  // Debug
   useEffect(() => {
-    console.log('StudentMenuPage menu state:', menu)
-  }, [menu])
+    console.log('StudentMenuPage — menuToday:', menuToday, 'menuTomorrow:', menuTomorrow)
+  }, [menuToday, menuTomorrow])
 
   // ── Skeleton ──
   if (isLoadingMenu) {
@@ -187,16 +295,16 @@ export function StudentMenuPage() {
   }
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
+    <div className="space-y-8">
+      {/* Page header */}
       <div className="bg-gradient-to-r from-amber-500 to-orange-500 rounded-2xl p-5 text-white">
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-xl font-bold flex items-center gap-2">
               <UtensilsCrossed className="h-6 w-6" />
-              Tomorrow's Tiffin Menu
+              Tiffin Menu
             </h1>
-            {menuDate && <p className="text-amber-100 text-sm mt-0.5">{menuDate}</p>}
+            <p className="text-amber-100 text-sm mt-0.5">Today &amp; Tomorrow's availability</p>
           </div>
           <div className="text-right">
             <p className="text-2xl font-bold">{totalItems}</p>
@@ -205,53 +313,38 @@ export function StudentMenuPage() {
         </div>
       </div>
 
-      {/* Deadline notice */}
+      {/* Info notice */}
       <div className="flex items-center gap-3 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3">
         <AlertCircle className="h-5 w-5 text-amber-600 flex-shrink-0" />
         <p className="text-sm text-amber-800">
-          <span className="font-bold">Order deadline: midnight tonight.</span>{' '}
-          All orders are for tomorrow only. Payment required to confirm.
+          <span className="font-bold">Same-day orders are accepted</span> until the ordering deadline
+          shown on each card. Payment is required to confirm your order.
         </p>
       </div>
 
-      {/* Menu content */}
-      {totalItems === 0 ? (
-        <Card>
-          <CardContent className="py-16 text-center">
-            <UtensilsCrossed className="h-16 w-16 text-gray-300 mx-auto mb-4" />
-            <p className="text-gray-500 text-lg font-medium">No tiffin scheduled for tomorrow</p>
-            <p className="text-gray-400 text-sm mt-1">Check back later or contact your admin.</p>
-          </CardContent>
-        </Card>
-      ) : (
-        <div className="space-y-8">
-          {timeSlots.map((slot) => (
-            <div key={slot}>
-              {/* Time slot heading */}
-              <div className="flex items-center gap-3 mb-4">
-                <div className="flex items-center gap-2 bg-amber-100 text-amber-700 px-3 py-1.5 rounded-lg">
-                  <Clock className="h-4 w-4" />
-                  <span className="font-semibold text-sm">{slot}</span>
-                </div>
-                <div className="flex-1 h-px bg-amber-100" />
-                <span className="text-xs text-gray-400">{menu[slot].length} item{menu[slot].length !== 1 ? 's' : ''}</span>
-              </div>
+      {/* ── Today's Section ── */}
+      <MenuSection
+        title="Today's Tiffin"
+        subtitle={today ?? ''}
+        accentClass="bg-orange-100 text-orange-800"
+        slots={menuToday}
+        orderedIds={orderedIds}
+        orderingId={orderingId}
+        onOrder={handleOrder}
+        emptyMessage="No tiffin scheduled for today"
+      />
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                {menu[slot].map((item) => (
-                  <TiffinCard
-                    key={item.id}
-                    item={item}
-                    isOrdered={orderedIds.has(item.id)}
-                    onOrder={() => handleOrder(item)}
-                    isOrdering={orderingId === item.id}
-                  />
-                ))}
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
+      {/* ── Tomorrow's Section ── */}
+      <MenuSection
+        title="Tomorrow's Tiffin"
+        subtitle={tomorrow ?? ''}
+        accentClass="bg-amber-100 text-amber-800"
+        slots={menuTomorrow}
+        orderedIds={orderedIds}
+        orderingId={orderingId}
+        onOrder={handleOrder}
+        emptyMessage="No tiffin scheduled for tomorrow"
+      />
     </div>
   )
 }
