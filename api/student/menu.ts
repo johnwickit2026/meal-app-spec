@@ -155,15 +155,7 @@ export const handler: Handler = async (event: HandlerEvent) => {
     const { data: menuItems, error: menuError } = await supabase
       .from('student_tiffin_menu')
       .select(`
-        id,
-        meal_id,
-        scheduled_date,
-        time_slot,
-        capacity,
-        price,
-        is_available,
-        ordering_deadline_hours,
-        created_at,
+        *,
         meal:meals (
           id,
           name,
@@ -248,7 +240,8 @@ export const handler: Handler = async (event: HandlerEvent) => {
       total_items: totalItems,
     })
   } catch (error) {
+    const detail = (error as any)?.message ?? String(error)
     console.error('Student menu fetch error:', error)
-    return res.status(500).json({ error: 'Internal server error' })
+    return res.status(500).json({ error: 'Internal server error', detail })
   }
 }

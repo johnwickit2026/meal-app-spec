@@ -140,6 +140,7 @@ export const useStudentStore = create<StudentState>((set, get) => ({
       })
       if (!res.ok) {
         const err = await res.json().catch(() => ({}))
+        if (err.detail) console.error('fetchMenu API detail:', err.detail)
         throw new Error(err.error || `Failed to fetch menu: ${res.status} ${res.statusText}`)
       }
       const data = await res.json()

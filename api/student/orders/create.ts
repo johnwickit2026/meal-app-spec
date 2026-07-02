@@ -140,7 +140,7 @@ export const handler: Handler = async (event: HandlerEvent) => {
     // Fetch the tiffin menu item
     const { data: menuItem, error: menuError } = await supabase
       .from('student_tiffin_menu')
-      .select('id, scheduled_date, time_slot, capacity, price, is_available, ordering_deadline_hours')
+      .select('*')
       .eq('id', tiffin_menu_id)
       .single()
 
