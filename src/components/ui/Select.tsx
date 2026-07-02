@@ -4,11 +4,11 @@ import { cn } from '../../lib/utils'
 export interface SelectProps extends SelectHTMLAttributes<HTMLSelectElement> {
   label?: string
   error?: string
-  options: { value: string; label: string }[]
+  options?: { value: string; label: string }[]
 }
 
 const Select = forwardRef<HTMLSelectElement, SelectProps>(
-  ({ className, label, error, options, id, ...props }, ref) => {
+  ({ className, label, error, options, id, children, ...props }, ref) => {
     const selectId = id || label?.toLowerCase().replace(/\s/g, '-')
 
     return (
@@ -32,11 +32,13 @@ const Select = forwardRef<HTMLSelectElement, SelectProps>(
           )}
           {...props}
         >
-          {options.map((option) => (
-            <option key={option.value} value={option.value}>
-              {option.label}
-            </option>
-          ))}
+          {options !== undefined
+            ? options.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))
+            : children}
         </select>
         {error && <p className="mt-1 text-sm text-red-600">{error}</p>}
       </div>

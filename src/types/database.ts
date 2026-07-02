@@ -177,7 +177,7 @@ export interface Database {
         Row: {
           id: string
           user_id: string
-          type: 'booking_confirmed' | 'booking_denied' | 'conflict' | 'reminder' | 'cancelled' | 'payment_success' | 'new_payment' | 'payment_pending'
+          type: 'booking_confirmed' | 'booking_denied' | 'conflict' | 'reminder' | 'cancelled' | 'payment_success' | 'new_payment' | 'payment_pending' | 'cash_request'
           message: string
           is_read: boolean
           created_at: string
@@ -185,7 +185,7 @@ export interface Database {
         Insert: {
           id?: string
           user_id: string
-          type: 'booking_confirmed' | 'booking_denied' | 'conflict' | 'reminder' | 'cancelled' | 'payment_success' | 'new_payment' | 'payment_pending'
+          type: 'booking_confirmed' | 'booking_denied' | 'conflict' | 'reminder' | 'cancelled' | 'payment_success' | 'new_payment' | 'payment_pending' | 'cash_request'
           message: string
           is_read?: boolean
           created_at?: string
@@ -193,7 +193,7 @@ export interface Database {
         Update: {
           id?: string
           user_id?: string
-          type?: 'booking_confirmed' | 'booking_denied' | 'conflict' | 'reminder' | 'cancelled' | 'payment_success' | 'new_payment' | 'payment_pending'
+          type?: 'booking_confirmed' | 'booking_denied' | 'conflict' | 'reminder' | 'cancelled' | 'payment_success' | 'new_payment' | 'payment_pending' | 'cash_request'
           message?: string
           is_read?: boolean
           created_at?: string
@@ -555,6 +555,7 @@ export interface Database {
             referencedColumns: ["id"]
           }
         ]
+      }
       meal_routines: {
         Row: {
           id: string

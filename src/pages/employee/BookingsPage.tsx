@@ -74,7 +74,7 @@ export function BookingsPage() {
         await supabase.from('notifications').insert(
           admins.map((admin) => ({
             user_id: admin.id,
-            type: 'cash_request',
+            type: 'cash_request' as const,
             message: notifMessage,
             is_read: false,
           }))

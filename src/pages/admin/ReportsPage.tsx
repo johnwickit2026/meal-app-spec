@@ -14,9 +14,10 @@ import {
   LineChart,
   Line,
 } from 'recharts'
-import { Card, CardContent, CardHeader, CardTitle, Loading, Select } from '../../components/ui'
+import { Card, CardContent, CardHeader, CardTitle, Loading, Select, Button } from '../../components/ui'
+import { supabase } from '../../lib/supabaseClient'
 import { format, subDays, subMonths } from 'date-fns'
-import { FileText, FileSpreadsheet, Download } from 'lucide-react'
+import { FileText, FileSpreadsheet } from 'lucide-react'
 import type { PaymentWithProfile } from '../../types'
 import { exportToExcel, exportToPDF } from '../../lib/exportUtils'
 import toast from 'react-hot-toast'

@@ -30,7 +30,7 @@ export function UserManagementPage() {
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false)
   const [userToDelete, setUserToDelete] = useState<Profile | null>(null)
   const [isDeleting, setIsDeleting] = useState(false)
-  const { profile: adminProfile } = useAuthStore()
+  const { profile: _adminProfile } = useAuthStore()
 
   const currentMonth = format(new Date(), 'yyyy-MM')
 

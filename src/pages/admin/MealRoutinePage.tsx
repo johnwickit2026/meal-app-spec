@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Plus, CalendarDays, Calendar as CalendarIcon, Repeat, Play, Trash2, Edit } from 'lucide-react'
+import { Plus, Calendar as CalendarIcon, Repeat, Play, Trash2 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle, Button, Input, Modal, Select, Badge } from '../../components/ui'
 import { supabase } from '../../lib/supabaseClient'
 import toast from 'react-hot-toast'
@@ -237,7 +237,7 @@ export default function MealRoutinePage() {
                             {meals.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
                           </Select>
                           <Input type="time" className="w-32" value={item.time_slot} onChange={e => updateRoutineItem(itemIdx, 'time_slot', e.target.value)} />
-                          <Select className="w-32" value={item.meal_type} onChange={e => updateRoutineItem(itemIdx, 'meal_type', e.target.value)}>
+                          <Select className="w-32" value={item.meal_type ?? 'both'} onChange={e => updateRoutineItem(itemIdx, 'meal_type', e.target.value)}>
                             <option value="both">Both</option>
                             <option value="employee">Employee</option>
                             <option value="student">Student</option>
@@ -280,7 +280,7 @@ export default function MealRoutinePage() {
                       {meals.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
                     </Select>
                     <Input type="time" className="w-32" value={item.time_slot} onChange={e => updateRoutineItem(itemIdx, 'time_slot', e.target.value)} />
-                    <Select className="w-32" value={item.meal_type} onChange={e => updateRoutineItem(itemIdx, 'meal_type', e.target.value)}>
+                    <Select className="w-32" value={item.meal_type ?? 'both'} onChange={e => updateRoutineItem(itemIdx, 'meal_type', e.target.value)}>
                       <option value="both">Both</option>
                       <option value="employee">Employee</option>
                       <option value="student">Student</option>
