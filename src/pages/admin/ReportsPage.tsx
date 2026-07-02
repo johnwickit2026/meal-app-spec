@@ -293,14 +293,14 @@ export function ReportsPage() {
     }
   }
 
-  const doExportPDF = () => {
+  const doExportPDF = async () => {
     if (!exportData.length) return toast.error('Generate report first')
-    exportToPDF(exportData, { filename: `MealReport_${exportStartDate}_to_${exportEndDate}`, title: 'Meal System Summary Report' })
+    await exportToPDF(exportData, { filename: `MealReport_${exportStartDate}_to_${exportEndDate}`, title: 'Meal System Summary Report' })
   }
 
-  const doExportExcel = () => {
+  const doExportExcel = async () => {
     if (!exportData.length) return toast.error('Generate report first')
-    exportToExcel(exportData, { filename: `MealReport_${exportStartDate}_to_${exportEndDate}` })
+    await exportToExcel(exportData, { filename: `MealReport_${exportStartDate}_to_${exportEndDate}` })
   }
 
   if (isLoading) {

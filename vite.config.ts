@@ -238,13 +238,48 @@ export default defineConfig(({ mode }) => {
     build: {
       rollupOptions: {
         output: {
-          manualChunks: {
-            'vendor-react': ['react', 'react-dom', 'react-router-dom'],
-            'vendor-supabase': ['@supabase/supabase-js'],
-            'vendor-charts': ['recharts'],
-            'vendor-forms': ['react-hook-form', '@hookform/resolvers', 'zod'],
-            'vendor-ui': ['lucide-react', 'react-hot-toast', 'clsx', 'tailwind-merge'],
-            'vendor-misc': ['zustand', 'axios', 'date-fns'],
+          manualChunks(id) {
+            if (!id.includes('node_modules')) return
+
+            // Recharts + all transitive deps (d3-*, victory-vendor, robust-predicates)
+            if (
+              id.includes('/recharts/') ||
+              id.includes('/d3-') ||
+              id.includes('/d3/') ||
+              id.includes('/victory-vendor/') ||
+              id.includes('/robust-predicates/')
+            ) {
+              return 'vendor-charts'
+            }
+
+            if (
+              id.includes('/react-dom/') ||
+              id.includes('/react-router') ||
+              id.includes('/react/')
+            ) {
+              return 'vendor-react'
+            }
+
+            if (id.includes('/@supabase/')) {
+              return 'vendor-supabase'
+            }
+
+            if (
+              id.includes('/lucide-react/') ||
+              id.includes('/react-hot-toast/') ||
+              id.includes('/clsx/') ||
+              id.includes('/tailwind-merge/')
+            ) {
+              return 'vendor-ui'
+            }
+
+            if (
+              id.includes('/zustand/') ||
+              id.includes('/date-fns/') ||
+              id.includes('/axios/')
+            ) {
+              return 'vendor-misc'
+            }
           },
         },
       },

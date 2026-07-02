@@ -1,14 +1,12 @@
-import * as XLSX from 'xlsx'
-import jsPDF from 'jspdf'
-import 'jspdf-autotable'
-
 interface ExportOptions {
   filename: string
   title?: string
 }
 
-export function exportToExcel(data: any[], options: ExportOptions) {
+export async function exportToExcel(data: any[], options: ExportOptions) {
   if (!data || data.length === 0) return
+
+  const XLSX = await import('xlsx')
 
   // Create a new workbook and worksheet
   const workbook = XLSX.utils.book_new()
@@ -23,8 +21,11 @@ export function exportToExcel(data: any[], options: ExportOptions) {
   XLSX.writeFile(workbook, `${options.filename}.xlsx`)
 }
 
-export function exportToPDF(data: any[], options: ExportOptions) {
+export async function exportToPDF(data: any[], options: ExportOptions) {
   if (!data || data.length === 0) return
+
+  const { default: jsPDF } = await import('jspdf')
+  await import('jspdf-autotable')
 
   const doc = new jsPDF()
   
