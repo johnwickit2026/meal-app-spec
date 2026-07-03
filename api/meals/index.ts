@@ -5,20 +5,27 @@ import { getCache, setCache } from '../_cache.js'
 import { maskEmail } from '../_validation.js'
 import { checkRateLimit, RATE_LIMITS, getClientIP, logSecurityEvent } from '../_security.js'
 
-const supabaseUrl = process.env.VITE_SUPABASE_URL
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
-
-if (!supabaseUrl || !supabaseServiceKey) {
-  throw new Error('Missing required environment variables: VITE_SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY')
-}
-
-const supabase = createClient(supabaseUrl, supabaseServiceKey)
-
 const allowedOrigins = (process.env.ALLOWED_ORIGINS || 'http://localhost:5173').split(',').map(o => o.trim())
 
 const CACHE_TTL = 60 // 60 seconds
 
 export const handler: Handler = async (event: HandlerEvent) => {
+  const supabaseUrl = process.env.VITE_SUPABASE_URL
+  const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+
+  if (!supabaseUrl || !supabaseServiceKey) {
+    return {
+      statusCode: 500,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ 
+        success: false, 
+        error: 'Server configuration error' 
+      })
+    }
+  }
+
+  const supabase = createClient(supabaseUrl, supabaseServiceKey)
+
   const { req, res } = createReqRes(event)
   const origin = req.headers.origin
   const clientIP = getClientIP(req)

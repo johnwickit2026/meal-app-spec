@@ -3,26 +3,40 @@ import { createReqRes } from '../_netlify_shim.js'
 import { createClient } from '@supabase/supabase-js'
 import { checkRateLimit, RATE_LIMITS, getClientIP, logSecurityEvent } from '../_security.js'
 
-const supabaseUrl = process.env.VITE_SUPABASE_URL
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
-const sslStoreId = process.env.SSLCOMMERZ_STORE_ID
-const sslStorePassword = process.env.SSLCOMMERZ_STORE_PASSWORD
-
-if (!supabaseUrl || !supabaseServiceKey) {
-  throw new Error('Missing required environment variables: VITE_SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY')
-}
-if (!sslStoreId || !sslStorePassword) {
-  throw new Error('Missing required environment variables: SSLCOMMERZ_STORE_ID, SSLCOMMERZ_STORE_PASSWORD')
-}
-
-const supabase = createClient(supabaseUrl, supabaseServiceKey)
-
 const allowedOrigins = (process.env.ALLOWED_ORIGINS || 'http://localhost:5173').split(',').map(o => o.trim())
 
 const SSLCOMMERZ_VALIDATE_URL =
   'https://sandbox.sslcommerz.com/validator/api/validationserverAPI.php'
 
 export const handler: Handler = async (event: HandlerEvent) => {
+  const supabaseUrl = process.env.VITE_SUPABASE_URL
+  const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+  const sslStoreId = process.env.SSLCOMMERZ_STORE_ID
+  const sslStorePassword = process.env.SSLCOMMERZ_STORE_PASSWORD
+
+  if (!supabaseUrl || !supabaseServiceKey) {
+    return {
+      statusCode: 500,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ 
+        success: false, 
+        error: 'Server configuration error' 
+      })
+    }
+  }
+  if (!sslStoreId || !sslStorePassword) {
+    return {
+      statusCode: 500,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ 
+        success: false, 
+        error: 'Server configuration error' 
+      })
+    }
+  }
+
+  const supabase = createClient(supabaseUrl, supabaseServiceKey)
+
   const { req, res } = createReqRes(event)
   const origin = req.headers.origin
   const clientIP = getClientIP(req)

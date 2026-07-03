@@ -1,14 +1,23 @@
-import { createClient } from '@supabase/supabase-js'
+import { createClient, SupabaseClient } from '@supabase/supabase-js'
 import { getSecurityHeaders, getSecureCorsHeaders } from './_security.js'
 
-const supabaseUrl = process.env.VITE_SUPABASE_URL
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+let _supabaseAdmin: SupabaseClient<any, any, any> | null = null
 
-if (!supabaseUrl || !supabaseServiceKey) {
-  throw new Error('Missing required environment variables: VITE_SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY')
+// Lazily create the Supabase admin client so a missing env var doesn't crash
+// the whole module (and any handler that imports from this file) on load.
+export function getSupabaseAdmin() {
+  if (_supabaseAdmin) return _supabaseAdmin
+
+  const supabaseUrl = process.env.VITE_SUPABASE_URL
+  const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+
+  if (!supabaseUrl || !supabaseServiceKey) {
+    throw new Error('Missing required environment variables: VITE_SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY')
+  }
+
+  _supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey)
+  return _supabaseAdmin
 }
-
-export const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey)
 
 const allowedOrigins = (process.env.ALLOWED_ORIGINS || 'http://localhost:5173').split(',').map(o => o.trim())
 const isProduction = process.env.NODE_ENV === 'production'
@@ -82,6 +91,7 @@ export type UserRole = 'employee' | 'admin' | 'food_editor' | 'finance_editor'
 
 // Verify token and return user with role
 export async function verifyTokenWithRole(token: string) {
+  const supabaseAdmin = getSupabaseAdmin()
   const { data: { user }, error } = await supabaseAdmin.auth.getUser(token)
   if (error || !user) return null
 

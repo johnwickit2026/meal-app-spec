@@ -2,16 +2,23 @@ import type { Handler, HandlerEvent } from '@netlify/functions'
 import { createReqRes } from '../../_netlify_shim.js'
 import { createClient } from '@supabase/supabase-js'
 
-const supabaseUrl = process.env.VITE_SUPABASE_URL
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
-
-if (!supabaseUrl || !supabaseServiceKey) {
-  throw new Error('Missing environment variables')
-}
-
-const supabase = createClient(supabaseUrl, supabaseServiceKey)
-
 export const handler: Handler = async (event: HandlerEvent) => {
+  const supabaseUrl = process.env.VITE_SUPABASE_URL
+  const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+
+  if (!supabaseUrl || !supabaseServiceKey) {
+    return {
+      statusCode: 500,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ 
+        success: false, 
+        error: 'Server configuration error' 
+      })
+    }
+  }
+
+  const supabase = createClient(supabaseUrl, supabaseServiceKey)
+
   const { req, res } = createReqRes(event)
   if (req.method !== 'GET') {
     return res.status(405).json({ error: 'Method not allowed' })

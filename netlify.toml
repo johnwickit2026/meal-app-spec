@@ -69,6 +69,72 @@
   to = "/.netlify/functions/admin/users/balance"
   status = 200
 
+# ── Additional explicit API routes ────────────────────────────────────────────
+[[redirects]]
+  from = "/api/admin/users"
+  to = "/.netlify/functions/admin/users"
+  status = 200
+
+[[redirects]]
+  from = "/api/admin/approve"
+  to = "/.netlify/functions/admin/approve"
+  status = 200
+
+[[redirects]]
+  from = "/api/admin/deny"
+  to = "/.netlify/functions/admin/deny"
+  status = 200
+
+[[redirects]]
+  from = "/api/admin/meals"
+  to = "/.netlify/functions/admin/meals"
+  status = 200
+
+[[redirects]]
+  from = "/api/admin/routines/apply"
+  to = "/.netlify/functions/admin/routines/apply"
+  status = 200
+
+[[redirects]]
+  from = "/api/admin/reports/export"
+  to = "/.netlify/functions/admin/reports/export"
+  status = 200
+
+[[redirects]]
+  from = "/api/meals/schedule"
+  to = "/.netlify/functions/meals/schedule"
+  status = 200
+
+[[redirects]]
+  from = "/api/payments/initiate"
+  to = "/.netlify/functions/payments/initiate"
+  status = 200
+
+[[redirects]]
+  from = "/api/payments/callback"
+  to = "/.netlify/functions/payments/callback"
+  status = 200
+
+[[redirects]]
+  from = "/api/bookings/list"
+  to = "/.netlify/functions/bookings/list"
+  status = 200
+
+[[redirects]]
+  from = "/api/bookings/history"
+  to = "/.netlify/functions/bookings/history"
+  status = 200
+
+[[redirects]]
+  from = "/api/bookings/create"
+  to = "/.netlify/functions/bookings/create"
+  status = 200
+
+[[redirects]]
+  from = "/api/bookings/cancel"
+  to = "/.netlify/functions/bookings/cancel"
+  status = 200
+
 # ── General API wildcard ──────────────────────────────────────────────────────
 [[redirects]]
   from = "/api/*"
