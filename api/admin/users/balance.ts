@@ -1,35 +1,18 @@
+import type { Handler, HandlerEvent } from '@netlify/functions'
 import { createClient } from '@supabase/supabase-js'
 
-async function verifyAdmin(req: Request, supabase: any) {
-  const authHeader = req.headers.get('authorization')
-  if (!authHeader || !authHeader.startsWith('Bearer ')) return false
-  const token = authHeader.split('Bearer ')[1]
-  const { data: { user }, error } = await supabase.auth.getUser(token)
-  if (error || !user) return false
-
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('role')
-    .eq('id', user.id)
-    .single()
-
-  return profile?.role === 'admin'
-}
-
-export default async function handler(req: Request) {
-  if (req.method === 'OPTIONS') {
-    return new Response(null, { status: 200, headers: {
+export const handler: Handler = async (event: HandlerEvent) => {
+  if (event.httpMethod === 'OPTIONS') {
+    return { statusCode: 200, headers: {
       'Access-Control-Allow-Origin': '*',
       'Access-Control-Allow-Methods': 'PATCH, OPTIONS',
       'Access-Control-Allow-Headers': 'Authorization, Content-Type'
-    }})
+    }, body: '' }
   }
 
-  if (req.method !== 'PATCH') {
-    return new Response(
-      JSON.stringify({ success: false, error: 'Method not allowed' }),
-      { status: 405, headers: { 'Content-Type': 'application/json' }}
-    )
+  if (event.httpMethod !== 'PATCH') {
+    return { statusCode: 405, headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ success: false, error: 'Method not allowed' }) }
   }
 
   try {
@@ -38,63 +21,50 @@ export default async function handler(req: Request) {
       process.env.SUPABASE_SERVICE_ROLE_KEY!
     )
 
-    const isAdmin = await verifyAdmin(req, supabaseAdmin)
-    if (!isAdmin) {
-      return new Response(
-        JSON.stringify({ success: false, error: 'Forbidden' }),
-        { status: 403, headers: { 'Content-Type': 'application/json' }}
-      )
+    const token = (event.headers.authorization || '').replace('Bearer ', '')
+    if (!token) return { statusCode: 401, headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ success: false, error: 'Unauthorized' }) }
+
+    const { data: { user }, error: authErr } = await supabaseAdmin.auth.getUser(token)
+    if (authErr || !user) return { statusCode: 401, headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ success: false, error: 'Invalid token' }) }
+
+    const { data: profile } = await supabaseAdmin.from('profiles')
+      .select('role').eq('id', user.id).single()
+    if (profile?.role !== 'admin') return { statusCode: 403,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ success: false, error: 'Forbidden' }) }
+
+    const body = event.body ? JSON.parse(event.body) : {}
+    const { userId, amount, note } = body
+
+    if (!userId || !amount || Number(amount) <= 0) {
+      return { statusCode: 400, headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ success: false, error: 'userId and valid amount required' }) }
     }
 
-    const { userId, amount, note } = await req.json() as any
+    const { data: userProfile, error: fetchErr } = await supabaseAdmin
+      .from('profiles').select('balance').eq('id', userId).single()
+    if (fetchErr) throw fetchErr
 
-    if (!userId || !amount || amount <= 0) {
-      return new Response(
-        JSON.stringify({ success: false, error: 'userId and valid amount required' }),
-        { status: 400, headers: { 'Content-Type': 'application/json' }}
-      )
-    }
+    const newBalance = (userProfile?.balance || 0) + parseFloat(amount)
 
-    // Get current balance
-    const { data: profile, error: fetchError } = await supabaseAdmin
-      .from('profiles')
-      .select('balance')
-      .eq('id', userId)
-      .single()
+    const { error: updateErr } = await supabaseAdmin
+      .from('profiles').update({ balance: newBalance }).eq('id', userId)
+    if (updateErr) throw updateErr
 
-    if (fetchError) throw fetchError
-
-    const currentBalance = profile?.balance || 0
-    const newBalance = currentBalance + parseFloat(amount)
-
-    // Update balance
-    const { error: updateError } = await supabaseAdmin
-      .from('profiles')
-      .update({ balance: newBalance })
-      .eq('id', userId)
-
-    if (updateError) throw updateError
-
-    // Send notification to user
     await supabaseAdmin.from('notifications').insert({
       user_id: userId,
       type: 'balance_added',
-      message: `BDT ${amount} has been added to your account balance. ${note ? 'Note: ' + note : ''}`
+      message: `BDT ${amount} has been added to your account balance.${note ? ' Note: ' + note : ''}`
     })
 
-    return new Response(
-      JSON.stringify({ 
-        success: true, 
-        message: 'Balance updated successfully',
-        data: { newBalance }
-      }),
-      { status: 200, headers: { 'Content-Type': 'application/json' }}
-    )
+    return { statusCode: 200, headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ success: true, message: 'Balance updated',
+        data: { newBalance } }) }
 
   } catch (err: any) {
-    return new Response(
-      JSON.stringify({ success: false, error: err.message }),
-      { status: 500, headers: { 'Content-Type': 'application/json' }}
-    )
+    return { statusCode: 500, headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ success: false, error: err.message }) }
   }
 }

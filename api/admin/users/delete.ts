@@ -1,35 +1,21 @@
+import type { Handler, HandlerEvent } from '@netlify/functions'
+import { createReqRes } from '../../_netlify_shim.js'
 import { createClient } from '@supabase/supabase-js'
 
-async function verifyAdmin(req: Request, supabase: any) {
-  const authHeader = req.headers.get('authorization')
-  if (!authHeader || !authHeader.startsWith('Bearer ')) return false
-  const token = authHeader.split('Bearer ')[1]
-  const { data: { user }, error } = await supabase.auth.getUser(token)
-  if (error || !user) return false
+export const handler: Handler = async (event: HandlerEvent) => {
+  const { req, res } = createReqRes(event)
 
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('role')
-    .eq('id', user.id)
-    .single()
-
-  return profile?.role === 'admin'
-}
-
-export default async function handler(req: Request) {
-  if (req.method === 'OPTIONS') {
-    return new Response(null, { status: 200, headers: {
+  if (event.httpMethod === 'OPTIONS') {
+    return { statusCode: 200, headers: {
       'Access-Control-Allow-Origin': '*',
       'Access-Control-Allow-Methods': 'DELETE, OPTIONS',
       'Access-Control-Allow-Headers': 'Authorization, Content-Type'
-    }})
+    }, body: '' }
   }
 
-  if (req.method !== 'DELETE') {
-    return new Response(
-      JSON.stringify({ success: false, error: 'Method not allowed' }),
-      { status: 405, headers: { 'Content-Type': 'application/json' }}
-    )
+  if (event.httpMethod !== 'DELETE') {
+    return { statusCode: 405, headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ success: false, error: 'Method not allowed' }) }
   }
 
   try {
@@ -38,41 +24,34 @@ export default async function handler(req: Request) {
       process.env.SUPABASE_SERVICE_ROLE_KEY!
     )
 
-    const isAdmin = await verifyAdmin(req, supabaseAdmin)
-    if (!isAdmin) {
-      return new Response(
-        JSON.stringify({ success: false, error: 'Forbidden' }),
-        { status: 403, headers: { 'Content-Type': 'application/json' }}
-      )
-    }
+    const token = (event.headers.authorization || '').replace('Bearer ', '')
+    if (!token) return { statusCode: 401, headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ success: false, error: 'Unauthorized' }) }
 
-    const { userId } = await req.json() as any
+    const { data: { user }, error: authErr } = await supabaseAdmin.auth.getUser(token)
+    if (authErr || !user) return { statusCode: 401, headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ success: false, error: 'Invalid token' }) }
 
-    if (!userId) {
-      return new Response(
-        JSON.stringify({ success: false, error: 'userId is required' }),
-        { status: 400, headers: { 'Content-Type': 'application/json' }}
-      )
-    }
+    const { data: profile } = await supabaseAdmin.from('profiles')
+      .select('role').eq('id', user.id).single()
+    if (profile?.role !== 'admin') return { statusCode: 403,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ success: false, error: 'Forbidden' }) }
+
+    const body = event.body ? JSON.parse(event.body) : {}
+    const { userId } = body
+    if (!userId) return { statusCode: 400, headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ success: false, error: 'userId is required' }) }
 
     const { error } = await supabaseAdmin.auth.admin.deleteUser(userId)
+    if (error) return { statusCode: 500, headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ success: false, error: error.message }) }
 
-    if (error) {
-      return new Response(
-        JSON.stringify({ success: false, error: error.message }),
-        { status: 500, headers: { 'Content-Type': 'application/json' }}
-      )
-    }
-
-    return new Response(
-      JSON.stringify({ success: true, message: 'User deleted successfully' }),
-      { status: 200, headers: { 'Content-Type': 'application/json' }}
-    )
+    return { statusCode: 200, headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ success: true, message: 'User deleted successfully' }) }
 
   } catch (err: any) {
-    return new Response(
-      JSON.stringify({ success: false, error: err.message }),
-      { status: 500, headers: { 'Content-Type': 'application/json' }}
-    )
+    return { statusCode: 500, headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ success: false, error: err.message }) }
   }
 }

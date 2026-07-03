@@ -59,6 +59,16 @@
   to = "/.netlify/functions/student/orders/create"
   status = 200
 
+[[redirects]]
+  from = "/api/admin/users/delete"
+  to = "/.netlify/functions/admin/users/delete"
+  status = 200
+
+[[redirects]]
+  from = "/api/admin/users/balance"
+  to = "/.netlify/functions/admin/users/balance"
+  status = 200
+
 # ── General API wildcard ──────────────────────────────────────────────────────
 [[redirects]]
   from = "/api/*"
