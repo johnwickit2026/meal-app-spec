@@ -1,12 +1,13 @@
 import type { Handler, HandlerEvent } from '@netlify/functions'
 import { createClient } from '@supabase/supabase-js'
 
-export const handler: Handler = async (event: HandlerEvent) => {
+export const handler: Handler = async (event: HandlerEvent): Promise<any> => {
   if (event.httpMethod === 'OPTIONS') {
     return { statusCode: 200, headers: {
       'Access-Control-Allow-Origin': '*',
       'Access-Control-Allow-Methods': 'PATCH, OPTIONS',
-      'Access-Control-Allow-Headers': 'Authorization, Content-Type'
+      'Access-Control-Allow-Headers': 'Authorization, Content-Type',
+      'Content-Type': 'application/json'
     }, body: '' }
   }
 

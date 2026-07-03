@@ -2,14 +2,15 @@ import type { Handler, HandlerEvent } from '@netlify/functions'
 import { createReqRes } from '../../_netlify_shim.js'
 import { createClient } from '@supabase/supabase-js'
 
-export const handler: Handler = async (event: HandlerEvent) => {
+export const handler: Handler = async (event: HandlerEvent): Promise<any> => {
   const { req, res } = createReqRes(event)
 
   if (event.httpMethod === 'OPTIONS') {
     return { statusCode: 200, headers: {
       'Access-Control-Allow-Origin': '*',
       'Access-Control-Allow-Methods': 'DELETE, OPTIONS',
-      'Access-Control-Allow-Headers': 'Authorization, Content-Type'
+      'Access-Control-Allow-Headers': 'Authorization, Content-Type',
+      'Content-Type': 'application/json'
     }, body: '' }
   }
 
