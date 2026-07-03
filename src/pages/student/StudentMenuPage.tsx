@@ -13,7 +13,7 @@ import {
 } from 'lucide-react'
 import { useStudentStore } from '../../store/studentStore'
 import type { TiffinMenuItem, StudentMenuGrouped } from '../../store/studentStore'
-import { Card, CardContent, Button, Badge, CardSkeleton } from '../../components/ui'
+import { Card, CardContent, Button, Badge } from '../../components/ui'
 import toast from 'react-hot-toast'
 import { getMealDeadline, formatTime } from '../../lib/utils'
 
@@ -239,6 +239,7 @@ export function StudentMenuPage() {
     today,
     tomorrow,
     isLoadingMenu,
+    menuError,
     fetchMenu,
     upcomingOrders,
     fetchOrders,
@@ -288,8 +289,33 @@ export function StudentMenuPage() {
       <div className="space-y-6">
         <div className="h-20 bg-amber-50 rounded-2xl animate-pulse border border-amber-100" />
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {[1, 2, 3].map((i) => <CardSkeleton key={i} />)}
+          <div className="animate-pulse bg-gray-200 rounded-lg h-32 w-full" />
+          <div className="animate-pulse bg-gray-200 rounded-lg h-32 w-full" />
+          <div className="animate-pulse bg-gray-200 rounded-lg h-32 w-full" />
         </div>
+      </div>
+    )
+  }
+
+  // ── Error state ──
+  if (menuError) {
+    return (
+      <div className="space-y-6">
+        <Card className="border-red-200 bg-red-50">
+          <CardContent className="py-10 text-center">
+            <AlertCircle className="h-10 w-10 text-red-500 mx-auto mb-3" />
+            <p className="text-red-700 font-medium">
+              Failed to load menu. Please refresh the page or contact support.
+            </p>
+            <Button
+              onClick={() => fetchMenu()}
+              className="mt-4 bg-red-600 hover:bg-red-700 text-white border-0"
+              size="sm"
+            >
+              Retry
+            </Button>
+          </CardContent>
+        </Card>
       </div>
     )
   }
@@ -322,29 +348,41 @@ export function StudentMenuPage() {
         </p>
       </div>
 
-      {/* ── Today's Section ── */}
-      <MenuSection
-        title="Today's Tiffin"
-        subtitle={today ?? ''}
-        accentClass="bg-orange-100 text-orange-800"
-        slots={menuToday}
-        orderedIds={orderedIds}
-        orderingId={orderingId}
-        onOrder={handleOrder}
-        emptyMessage="No tiffin scheduled for today"
-      />
+      {/* ── Today's & Tomorrow's Sections (or unified empty state) ── */}
+      {totalItems === 0 ? (
+        <Card>
+          <CardContent className="py-12 text-center">
+            <UtensilsCrossed className="h-12 w-12 text-gray-300 mx-auto mb-3" />
+            <p className="text-gray-700 font-medium">
+              No tiffin has been scheduled yet. Check back later or contact admin.
+            </p>
+          </CardContent>
+        </Card>
+      ) : (
+        <>
+          <MenuSection
+            title="Today's Tiffin"
+            subtitle={today ?? ''}
+            accentClass="bg-orange-100 text-orange-800"
+            slots={menuToday}
+            orderedIds={orderedIds}
+            orderingId={orderingId}
+            onOrder={handleOrder}
+            emptyMessage="No tiffin scheduled for today"
+          />
 
-      {/* ── Tomorrow's Section ── */}
-      <MenuSection
-        title="Tomorrow's Tiffin"
-        subtitle={tomorrow ?? ''}
-        accentClass="bg-amber-100 text-amber-800"
-        slots={menuTomorrow}
-        orderedIds={orderedIds}
-        orderingId={orderingId}
-        onOrder={handleOrder}
-        emptyMessage="No tiffin scheduled for tomorrow"
-      />
+          <MenuSection
+            title="Tomorrow's Tiffin"
+            subtitle={tomorrow ?? ''}
+            accentClass="bg-amber-100 text-amber-800"
+            slots={menuTomorrow}
+            orderedIds={orderedIds}
+            orderingId={orderingId}
+            onOrder={handleOrder}
+            emptyMessage="No tiffin scheduled for tomorrow"
+          />
+        </>
+      )}
     </div>
   )
 }

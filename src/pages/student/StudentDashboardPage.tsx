@@ -18,7 +18,7 @@ import { useAuthStore } from '../../store'
 import { useStudentStore } from '../../store/studentStore'
 import { getRoleBadgeClasses, getRoleDisplayName } from '../../lib/roles'
 import { cn } from '../../lib/utils'
-import { Card, CardContent, CardHeader, CardTitle, Button, CardSkeleton, Badge } from '../../components/ui'
+import { Card, CardContent, CardHeader, CardTitle, Button, Badge } from '../../components/ui'
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -33,8 +33,19 @@ const STATUS_CONFIG = {
 
 export function StudentDashboardPage() {
   const { profile } = useAuthStore()
-  const { upcomingOrders, pastOrders, isLoadingOrders, fetchOrders, menu, isLoadingMenu, fetchMenu, menuDate, payWithBalance } =
-    useStudentStore()
+  const {
+    upcomingOrders,
+    pastOrders,
+    isLoadingOrders,
+    ordersError,
+    fetchOrders,
+    menu,
+    isLoadingMenu,
+    menuError,
+    fetchMenu,
+    menuDate,
+    payWithBalance,
+  } = useStudentStore()
   const [isPayingWithBalance, setIsPayingWithBalance] = useState(false)
 
   const handlePayWithBalance = async (orderId: string) => {
@@ -62,14 +73,37 @@ export function StudentDashboardPage() {
       <div className="space-y-6">
         <div className="bg-gradient-to-r from-amber-500 to-orange-500 rounded-2xl p-6 h-32 animate-pulse" />
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <CardSkeleton />
-          <CardSkeleton />
-          <CardSkeleton />
+          <div className="animate-pulse bg-gray-200 rounded-lg h-32 w-full" />
+          <div className="animate-pulse bg-gray-200 rounded-lg h-32 w-full" />
+          <div className="animate-pulse bg-gray-200 rounded-lg h-32 w-full" />
         </div>
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <CardSkeleton />
-          <CardSkeleton />
-        </div>
+      </div>
+    )
+  }
+
+  // ── Error state (orders and/or menu failed to load) ──
+  const loadError = ordersError || menuError
+  if (loadError && !isLoadingOrders && !isLoadingMenu) {
+    return (
+      <div className="space-y-6">
+        <Card className="border-red-200 bg-red-50">
+          <CardContent className="py-10 text-center">
+            <AlertCircle className="h-10 w-10 text-red-500 mx-auto mb-3" />
+            <p className="text-red-700 font-medium">
+              Failed to load menu. Please refresh the page or contact support.
+            </p>
+            <Button
+              onClick={() => {
+                fetchOrders()
+                fetchMenu()
+              }}
+              className="mt-4 bg-red-600 hover:bg-red-700 text-white border-0"
+              size="sm"
+            >
+              Retry
+            </Button>
+          </CardContent>
+        </Card>
       </div>
     )
   }
@@ -246,6 +280,18 @@ export function StudentDashboardPage() {
                     </Link>
                   </div>
                 )}
+              </div>
+            ) : totalCount === 0 ? (
+              <div className="text-center py-8">
+                <ShoppingBag className="h-12 w-12 text-gray-300 mx-auto mb-3" />
+                <p className="text-gray-500 mb-4">
+                  You have no orders yet. Browse tomorrow's menu to place your first order.
+                </p>
+                <Link to="/student/menu">
+                  <Button className="bg-amber-500 hover:bg-amber-600 text-white border-0" size="sm">
+                    Browse Tomorrow's Menu
+                  </Button>
+                </Link>
               </div>
             ) : (
               <div className="text-center py-8">

@@ -89,12 +89,16 @@ interface StudentState {
   /** Tomorrow's date string YYYY-MM-DD as returned by the API */
   tomorrow: string | null
   isLoadingMenu: boolean
+  /** Set when the last fetchMenu() call failed; cleared on the next successful fetch */
+  menuError: string | null
 
   // Orders
   orders: StudentOrder[]
   upcomingOrders: StudentOrder[]
   pastOrders: StudentOrder[]
   isLoadingOrders: boolean
+  /** Set when the last fetchOrders() call failed; cleared on the next successful fetch */
+  ordersError: string | null
 
   // Actions
   fetchMenu: () => Promise<void>
@@ -123,14 +127,16 @@ export const useStudentStore = create<StudentState>((set, get) => ({
   today: null,
   tomorrow: null,
   isLoadingMenu: false,
+  menuError: null,
 
   orders: [],
   upcomingOrders: [],
   pastOrders: [],
   isLoadingOrders: false,
+  ordersError: null,
 
   fetchMenu: async () => {
-    set({ isLoadingMenu: true })
+    set({ isLoadingMenu: true, menuError: null })
     try {
       const token = await getAuthHeader()
       if (!token) throw new Error('Not authenticated')
@@ -183,6 +189,7 @@ export const useStudentStore = create<StudentState>((set, get) => ({
         menuDate: null,
         today: null,
         tomorrow: null,
+        menuError: (error as Error).message || 'Failed to load menu',
       })
     } finally {
       set({ isLoadingMenu: false })
@@ -190,7 +197,7 @@ export const useStudentStore = create<StudentState>((set, get) => ({
   },
 
   fetchOrders: async () => {
-    set({ isLoadingOrders: true })
+    set({ isLoadingOrders: true, ordersError: null })
     try {
       const token = await getAuthHeader()
       if (!token) throw new Error('Not authenticated')
@@ -210,6 +217,7 @@ export const useStudentStore = create<StudentState>((set, get) => ({
       })
     } catch (error) {
       console.error('fetchOrders error:', error)
+      set({ ordersError: (error as Error).message || 'Failed to load orders' })
     } finally {
       set({ isLoadingOrders: false })
     }

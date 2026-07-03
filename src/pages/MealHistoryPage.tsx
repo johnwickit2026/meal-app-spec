@@ -6,7 +6,8 @@ import {
   Clock, 
   DollarSign,
   User,
-  Filter,
+  Users,
+  Filter, 
   Download,
   ChevronLeft,
   ChevronRight
@@ -269,20 +270,20 @@ export function MealHistoryPage() {
         </Card>
       </div>
 
-      {isAdmin && (
-        <div className="flex border-b border-gray-200 mb-6">
+      <div className="flex border-b border-gray-200 mb-6">
+        <button
+          onClick={() => { setActiveTab('regular'); setCurrentPage(1); }}
+          className={`py-3 px-6 text-sm font-medium border-b-2 ${
+            activeTab === 'regular'
+              ? 'border-primary-600 text-primary-600'
+              : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+          }`}
+        >
+          {isAdmin ? 'Regular Bookings' : 'My Bookings'}
+        </button>
+        {isAdmin && (
           <button
-            onClick={() => { setActiveTab('regular'); setCurrentPage(1); }}
-            className={`py-3 px-6 text-sm font-medium border-b-2 ${
-              activeTab === 'regular'
-                ? 'border-primary-600 text-primary-600'
-                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-            }`}
-          >
-            Regular Bookings
-          </button>
-          <button
-            onClick={() => { setActiveTab('guest'); setCurrentPage(1); }}
+            onClick={() => setActiveTab('guest')}
             className={`py-3 px-6 text-sm font-medium border-b-2 ${
               activeTab === 'guest'
                 ? 'border-primary-600 text-primary-600'
@@ -291,8 +292,8 @@ export function MealHistoryPage() {
           >
             Guest Meals
           </button>
-        </div>
-      )}
+        )}
+      </div>
 
       {/* Filters */}
       {activeTab === 'regular' && (
@@ -500,7 +501,11 @@ export function MealHistoryPage() {
           {isGuestLoading ? (
             <div className="p-8 text-center text-gray-500">Loading guest meals...</div>
           ) : guestHistory.length === 0 ? (
-            <div className="p-8 text-center text-gray-500">No guest meals found.</div>
+            <div className="p-8 text-center">
+              <Users className="h-12 w-12 text-gray-300 mx-auto mb-3" />
+              <p className="text-gray-600">No guest meals recorded yet.</p>
+              <p className="text-sm text-gray-500 mt-1">Add guest meals from Booking Management.</p>
+            </div>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full">
