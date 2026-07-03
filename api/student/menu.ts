@@ -38,10 +38,21 @@ function isValidDate(str: string): boolean {
  * time_slot is expected as "HH:MM" or "HH:MM:SS" (24-hour UTC).
  */
 function computeDeadline(scheduledDate: string, timeSlot: string, deadlineHours: number): Date {
-  // Parse "HH:MM" or "HH:MM:SS"
-  const [hh, mm] = (timeSlot || '00:00').split(':').map(Number)
-  const mealTime = new Date(`${scheduledDate}T${String(hh).padStart(2, '0')}:${String(mm || 0).padStart(2, '0')}:00Z`)
-  return new Date(mealTime.getTime() - deadlineHours * 60 * 60 * 1000)
+  // time_slot is free-form admin text (up to 50 chars), so it may not always be "HH:MM".
+  // Extract the leading HH:MM if present; otherwise fall back to midnight so we never
+  // construct an Invalid Date (which throws on toISOString()).
+  const match = /^(\d{1,2}):(\d{2})/.exec((timeSlot || '').trim())
+  let hh = match ? Number(match[1]) : 0
+  let mm = match ? Number(match[2]) : 0
+  if (!Number.isFinite(hh) || hh < 0 || hh > 23) hh = 0
+  if (!Number.isFinite(mm) || mm < 0 || mm > 59) mm = 0
+
+  const mealTime = new Date(`${scheduledDate}T${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}:00Z`)
+  const safeMealTime = Number.isNaN(mealTime.getTime())
+    ? new Date(`${scheduledDate}T00:00:00Z`)
+    : mealTime
+  const deadline = new Date(safeMealTime.getTime() - deadlineHours * 60 * 60 * 1000)
+  return Number.isNaN(deadline.getTime()) ? new Date() : deadline
 }
 
 export const handler: Handler = async (event: HandlerEvent) => {
