@@ -25,10 +25,11 @@ const STATUS_CONFIG: Record<
   StudentOrder['status'],
   { label: string; variant: 'pending' | 'confirmed' | 'cancelled' | 'success'; Icon: React.ElementType; color: string }
 > = {
-  pending:   { label: 'Pending Payment', variant: 'pending',   Icon: Clock,         color: 'text-yellow-600' },
-  paid:      { label: 'Paid',            variant: 'confirmed', Icon: CheckCircle2,  color: 'text-green-600'  },
-  cancelled: { label: 'Cancelled',       variant: 'cancelled', Icon: XCircle,       color: 'text-gray-500'   },
-  delivered: { label: 'Delivered',       variant: 'success',   Icon: Package,       color: 'text-blue-600'   },
+  pending:   { label: 'Awaiting Approval', variant: 'pending',   Icon: Clock,         color: 'text-yellow-600' },
+  confirmed: { label: 'Confirmed — Pay Now', variant: 'confirmed', Icon: CheckCircle2, color: 'text-amber-600'  },
+  paid:      { label: 'Paid',              variant: 'confirmed', Icon: CheckCircle2,  color: 'text-green-600'  },
+  cancelled: { label: 'Cancelled',         variant: 'cancelled', Icon: XCircle,       color: 'text-gray-500'   },
+  delivered: { label: 'Delivered',         variant: 'success',   Icon: Package,       color: 'text-blue-600'   },
 }
 
 // ─── Order Row ────────────────────────────────────────────────────────────────

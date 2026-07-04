@@ -41,7 +41,7 @@ export interface StudentOrder {
   id: string
   student_id: string
   tiffin_menu_id: string
-  status: 'pending' | 'paid' | 'cancelled' | 'delivered'
+  status: 'pending' | 'confirmed' | 'paid' | 'cancelled' | 'delivered'
   quantity: number
   total_amount: number
   order_date: string

@@ -58,7 +58,7 @@ export const handler: Handler = async (event: HandlerEvent) => {
   } else {
     res.setHeader('Access-Control-Allow-Origin', allowedOrigins[0])
   }
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS')
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization')
 
   if (req.method === 'OPTIONS') {
@@ -156,6 +156,101 @@ export const handler: Handler = async (event: HandlerEvent) => {
       })
 
       return res.status(201).json({ success: true, routine })
+    }
+
+    if (req.method === 'PUT') {
+      const { id, name, description, items } = req.body
+
+      if (!id) {
+        return res.status(400).json({ error: 'Routine id is required' })
+      }
+      if (!Array.isArray(items)) {
+        return res.status(400).json({ error: 'Invalid input' })
+      }
+
+      // 1. Remove existing items for this routine
+      const { error: deleteItemsError } = await supabase
+        .from('meal_routine_items')
+        .delete()
+        .eq('routine_id', id)
+
+      if (deleteItemsError) throw deleteItemsError
+
+      // 2. Re-insert new items
+      const itemsToInsert = items.map(item => ({
+        routine_id: id,
+        meal_id: item.meal_id,
+        day_of_week: item.day_of_week ?? null,
+        day_of_month: item.day_of_month ?? null,
+        time_slot: item.time_slot,
+        capacity: item.capacity || 10,
+        ordering_deadline_hours: item.ordering_deadline_hours || 1,
+        meal_type: item.meal_type || 'employee',
+        price: item.price || null
+      }))
+
+      if (itemsToInsert.length > 0) {
+        const { error: itemsError } = await supabase
+          .from('meal_routine_items')
+          .insert(itemsToInsert)
+
+        if (itemsError) throw itemsError
+      }
+
+      // 3. Update routine name and description
+      const { data: routine, error: updateError } = await supabase
+        .from('meal_routines')
+        .update({
+          name,
+          description: description || null
+        })
+        .eq('id', id)
+        .select()
+        .single()
+
+      if (updateError) throw updateError
+
+      logSecurityEvent('ADMIN_ACTION', req, {
+        userId: user.id,
+        email: maskEmail(user.email || ''),
+        severity: 'INFO',
+        details: { action: 'ROUTINE_UPDATED', routineId: id, itemsCount: itemsToInsert.length }
+      })
+
+      return res.status(200).json({ success: true, routine })
+    }
+
+    if (req.method === 'DELETE') {
+      const { id } = req.body
+
+      if (!id) {
+        return res.status(400).json({ error: 'Routine id is required' })
+      }
+
+      // 1. Delete routine items
+      const { error: itemsError } = await supabase
+        .from('meal_routine_items')
+        .delete()
+        .eq('routine_id', id)
+
+      if (itemsError) throw itemsError
+
+      // 2. Delete the routine
+      const { error: routineError } = await supabase
+        .from('meal_routines')
+        .delete()
+        .eq('id', id)
+
+      if (routineError) throw routineError
+
+      logSecurityEvent('ADMIN_ACTION', req, {
+        userId: user.id,
+        email: maskEmail(user.email || ''),
+        severity: 'INFO',
+        details: { action: 'ROUTINE_DELETED', routineId: id }
+      })
+
+      return res.status(200).json({ success: true })
     }
 
     return res.status(405).json({ error: 'Method not allowed' })

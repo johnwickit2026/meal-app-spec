@@ -108,7 +108,7 @@ export const handler: Handler = async (event: HandlerEvent) => {
     // Get schedule details
     const { data: schedule, error: scheduleError } = await supabase
       .from('menu_schedules')
-      .select('scheduled_date, time_slot, capacity, ordering_deadline_hours')
+      .select('scheduled_date, time_slot, capacity, ordering_deadline_hours, price')
       .eq('id', menu_schedule_id)
       .single()
 
@@ -187,6 +187,7 @@ export const handler: Handler = async (event: HandlerEvent) => {
         menu_schedule_id,
         status: 'pending',
         notes: notes,
+        price_at_booking: schedule?.price ?? null,
       })
       .select()
       .single()

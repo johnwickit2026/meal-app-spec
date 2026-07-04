@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Plus, Calendar as CalendarIcon, Repeat, Play, Trash2 } from 'lucide-react'
+import { Plus, Calendar as CalendarIcon, Repeat, Play, Trash2, Pencil } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle, Button, Input, Modal, Select, Badge } from '../../components/ui'
 import { supabase } from '../../lib/supabaseClient'
 import toast from 'react-hot-toast'
@@ -14,8 +14,9 @@ export default function MealRoutinePage() {
   const [meals, setMeals] = useState<Meal[]>([])
   const [isLoading, setIsLoading] = useState(true)
 
-  // Create Modal State
+  // Create / Edit Modal State
   const [isCreateOpen, setIsCreateOpen] = useState(false)
+  const [editingId, setEditingId] = useState<string | null>(null)
   const [newRoutine, setNewRoutine] = useState({ name: '', description: '', routine_type: 'weekly' })
   const [newItems, setNewItems] = useState<Partial<MealRoutineItem>[]>([])
 
@@ -54,17 +55,70 @@ export default function MealRoutinePage() {
     if (data) setMeals(data)
   }
 
+  const resetForm = () => {
+    setEditingId(null)
+    setNewRoutine({ name: '', description: '', routine_type: 'weekly' })
+    setNewItems([])
+  }
+
+  const closeCreateModal = () => {
+    setIsCreateOpen(false)
+    resetForm()
+  }
+
+  const handleEditRoutine = (routine: RoutineWithItems) => {
+    setEditingId(routine.id)
+    setNewRoutine({
+      name: routine.name,
+      description: routine.description || '',
+      routine_type: routine.routine_type
+    })
+    setNewItems((routine.items || []).map(item => ({
+      meal_id: item.meal_id,
+      day_of_week: item.day_of_week ?? undefined,
+      day_of_month: item.day_of_month ?? undefined,
+      time_slot: item.time_slot,
+      capacity: item.capacity,
+      ordering_deadline_hours: item.ordering_deadline_hours,
+      meal_type: item.meal_type,
+      price: item.price
+    })))
+    setIsCreateOpen(true)
+  }
+
+  const handleDeleteRoutine = async (routineId: string) => {
+    if (!confirm('Delete this routine? This cannot be undone.')) return
+    const session = await supabase.auth.getSession()
+    const token = session.data.session?.access_token
+    const response = await fetch('/api/admin/routines', {
+      method: 'DELETE',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ id: routineId })
+    })
+    if (response.ok) {
+      toast.success('Routine deleted')
+      fetchRoutines()
+    } else {
+      toast.error('Failed to delete routine')
+    }
+  }
+
   const handleCreateRoutine = async () => {
     if (!newRoutine.name) return toast.error('Routine name is required')
     
+    const isEditing = !!editingId
     try {
       const response = await fetch('/api/admin/routines', {
-        method: 'POST',
+        method: isEditing ? 'PUT' : 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`
         },
         body: JSON.stringify({
+          id: editingId ?? undefined,
           name: newRoutine.name,
           description: newRoutine.description,
           routine_type: newRoutine.routine_type,
@@ -74,16 +128,14 @@ export default function MealRoutinePage() {
 
       if (!response.ok) {
         const err = await response.json().catch(() => ({}))
-        throw new Error(err.detail || err.error || 'Failed to create routine')
+        throw new Error(err.detail || err.error || 'Failed to save routine')
       }
-      toast.success('Routine created successfully')
-      setIsCreateOpen(false)
-      setNewRoutine({ name: '', description: '', routine_type: 'weekly' })
-      setNewItems([])
+      toast.success(isEditing ? 'Routine updated successfully' : 'Routine created successfully')
+      closeCreateModal()
       fetchRoutines()
     } catch (error) {
       console.error(error)
-      toast.error('Failed to create routine')
+      toast.error(isEditing ? 'Failed to update routine' : 'Failed to create routine')
     }
   }
 
@@ -192,6 +244,20 @@ export default function MealRoutinePage() {
                 >
                   <Play className="h-4 w-4" /> Apply Routine
                 </Button>
+                <Button
+                  variant="outline"
+                  className="flex justify-center items-center gap-2"
+                  onClick={() => handleEditRoutine(routine)}
+                >
+                  <Pencil className="h-4 w-4" /> Edit
+                </Button>
+                <Button
+                  variant="outline"
+                  className="flex justify-center items-center gap-2 text-red-600 border-red-200 hover:bg-red-50"
+                  onClick={() => handleDeleteRoutine(routine.id)}
+                >
+                  <Trash2 className="h-4 w-4" /> Delete
+                </Button>
               </div>
             </CardContent>
           </Card>
@@ -205,7 +271,7 @@ export default function MealRoutinePage() {
       </div>
 
       {/* CREATE ROUTINE MODAL */}
-      <Modal isOpen={isCreateOpen} onClose={() => setIsCreateOpen(false)} title="Create Meal Routine" size="xl">
+      <Modal isOpen={isCreateOpen} onClose={closeCreateModal} title={editingId ? 'Edit Meal Routine' : 'Create Meal Routine'} size="xl">
         <div className="space-y-6 px-4 sm:px-6 py-4">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-1">
@@ -303,8 +369,8 @@ export default function MealRoutinePage() {
           </div>
 
           <div className="flex justify-end gap-3 pt-6 px-4 sm:px-0 pb-1">
-            <Button variant="outline" onClick={() => setIsCreateOpen(false)}>Cancel</Button>
-            <Button onClick={handleCreateRoutine} disabled={newItems.length === 0}>Save Routine</Button>
+            <Button variant="outline" onClick={closeCreateModal}>Cancel</Button>
+            <Button onClick={handleCreateRoutine} disabled={newItems.length === 0}>{editingId ? 'Update Routine' : 'Save Routine'}</Button>
           </div>
         </div>
       </Modal>

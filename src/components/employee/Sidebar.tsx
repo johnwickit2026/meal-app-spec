@@ -13,6 +13,7 @@ import {
   History,
   GraduationCap,
   Repeat,
+  Settings,
 } from 'lucide-react'
 import { useState, useEffect } from 'react'
 import { useAuthStore, useUIStore } from '../../store'
@@ -85,6 +86,8 @@ export function Sidebar({ isAdmin = false }: SidebarProps) {
       links.push({ to: '/admin/student-tiffin', icon: GraduationCap, label: 'Student Tiffin' })
       links.push({ to: '/admin/routines', icon: Repeat, label: 'Meal Routines' })
     }
+    
+    links.push({ to: '/admin/settings', icon: Settings, label: 'Settings' })
     
     return links
   }

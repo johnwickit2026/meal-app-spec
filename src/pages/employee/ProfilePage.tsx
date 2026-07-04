@@ -208,7 +208,7 @@ export function ProfilePage() {
           <div className="bg-emerald-50 rounded-xl p-6 mb-6 text-center border border-emerald-100">
             <p className="text-emerald-800 text-sm font-medium mb-1">Current Balance</p>
             <p className="text-4xl font-bold text-emerald-600">
-              ৳{Number(profile?.balance || 0).toFixed(0)}
+              ৳{Number(profile?.balance ?? 0).toFixed(0)}
             </p>
           </div>
 

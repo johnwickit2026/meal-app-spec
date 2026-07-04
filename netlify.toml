@@ -15,17 +15,17 @@
 # ── Index-style routes (file is named index.ts; map without the /index suffix) ──
 [[redirects]]
   from = "/api/meals"
-  to = "/.netlify/functions/meals/index"
+  to = "/.netlify/functions/meals"
   status = 200
 
 [[redirects]]
   from = "/api/bookings"
-  to = "/.netlify/functions/bookings/index"
+  to = "/.netlify/functions/bookings"
   status = 200
 
 [[redirects]]
   from = "/api/notifications"
-  to = "/.netlify/functions/notifications/index"
+  to = "/.netlify/functions/notifications"
   status = 200
 
 [[redirects]]
@@ -133,6 +133,11 @@
 [[redirects]]
   from = "/api/bookings/cancel"
   to = "/.netlify/functions/bookings-cancel"
+  status = 200
+
+[[redirects]]
+  from = "/api/bookings-pay-balance"
+  to = "/.netlify/functions/bookings-pay-balance"
   status = 200
 
 # ── General API wildcard ──────────────────────────────────────────────────────
