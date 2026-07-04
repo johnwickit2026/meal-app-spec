@@ -228,6 +228,7 @@ export const handler: Handler = async (event: HandlerEvent) => {
         total_amount: totalAmount,
         order_date: today,
         meal_date: tomorrow,
+        price_at_booking: menuItem.price ?? null,
       })
       .select()
       .single()

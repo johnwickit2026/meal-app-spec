@@ -200,12 +200,16 @@ export function DashboardPage() {
         if (dueAmount !== null && typedBalanceData) {
           const availableBalance = typedBalanceData.balance
           if (availableBalance > 0) {
-            // Balance can offset some or all of the due amount
+            // Positive balance offsets the due amount
             const remainingDue = Math.max(0, dueAmount - availableBalance)
             setAdjustedDueAmount(remainingDue)
+          } else if (availableBalance < 0) {
+            // Negative balance means user already owes money
+            // Show it as debt separately, don't add to meal due
+            setAdjustedDueAmount(dueAmount)
+            // The negative balance is shown separately as debt
           } else {
-            // Negative balance means user owes more
-            setAdjustedDueAmount(dueAmount + Math.abs(availableBalance))
+            setAdjustedDueAmount(dueAmount)
           }
         } else {
           setAdjustedDueAmount(dueAmount)
@@ -428,13 +432,19 @@ export function DashboardPage() {
                 <p className="text-sm text-gray-500 mb-1">Current Balance</p>
                 {isLoadingBalance ? (
                   <p className="text-3xl font-bold">...</p>
-                ) : userBalance && userBalance.balance > 0 ? (
-                  <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-green-100 text-green-700 mt-1">
-                    <span className="text-xl font-bold">Balance: ৳{Math.abs(userBalance.balance).toFixed(0)}</span>
+                ) : userBalance && userBalance.balance >= 0 ? (
+                  <div className="inline-flex flex-col items-center gap-1 mt-1">
+                    <span className="text-emerald-600 text-xl font-bold">
+                      ৳{(userBalance.balance).toFixed(0)} available
+                    </span>
+                    <span className="text-xs text-emerald-600 font-medium">Available Balance</span>
                   </div>
                 ) : (
-                  <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-red-100 text-red-700 mt-1">
-                    <span className="text-xl font-bold">Due: ৳{Math.abs(userBalance?.balance || 0).toFixed(0)}</span>
+                  <div className="inline-flex flex-col items-center gap-1 mt-1">
+                    <span className="text-red-600 text-xl font-bold">
+                      ৳{Math.abs(userBalance?.balance || 0).toFixed(0)} debt
+                    </span>
+                    <span className="text-xs text-red-600 font-medium">Account Debt</span>
                   </div>
                 )}
               </div>

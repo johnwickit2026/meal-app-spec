@@ -29,6 +29,7 @@ const ReportsPage           = lazy(() => import('./pages/admin/ReportsPage'))
 const PaymentsPage          = lazy(() => import('./pages/admin/PaymentsPage'))
 const StudentTiffinPage     = lazy(() => import('./pages/admin/StudentTiffinPage'))
 const MealRoutinePage       = lazy(() => import('./pages/admin/MealRoutinePage'))
+const SettingsPage          = lazy(() => import('./pages/admin/SettingsPage'))
 
 // Shared Pages - lazy loaded
 const MealHistoryPage = lazy(() => import('./pages/MealHistoryPage'))
@@ -88,6 +89,7 @@ function App() {
           >
             <Route path="/admin" element={<AdminDashboardPage />} />
             <Route path="/admin/reports" element={<ReportsPage />} />
+            <Route path="/admin/settings" element={<SettingsPage />} />
           </Route>
 
           {/* Menu Management - Food Editors and Main Admins */}

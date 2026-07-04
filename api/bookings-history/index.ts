@@ -139,6 +139,7 @@ export const handler: Handler = async (event: HandlerEvent) => {
         booked_at,
         updated_at,
         user_id,
+        price_at_booking,
         profiles:user_id (id, full_name, email, department),
         menu_schedule:menu_schedule_id (
           id,
@@ -203,6 +204,7 @@ export const handler: Handler = async (event: HandlerEvent) => {
       updated_at: booking.updated_at,
       user: booking.profiles,
       meal: booking.menu_schedule?.meal,
+      price_at_booking: booking.price_at_booking,
       schedule: {
         id: booking.menu_schedule?.id,
         scheduled_date: booking.menu_schedule?.scheduled_date,

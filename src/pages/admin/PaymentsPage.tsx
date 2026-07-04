@@ -227,24 +227,34 @@ export function PaymentsPage() {
         .eq('id', request.id)
       if (reqError) throw reqError
 
-      // Mark payment as paid for current month
-      const { data: paymentData } = await supabase
+      // Find the matching unpaid bill for this user for the current month
+      const currentMonth = format(new Date(), 'yyyy-MM')
+      const { data: matchingBill } = await supabase
         .from('payments')
         .select('id')
         .eq('user_id', request.user_id)
-        .eq('month', selectedMonth)
+        .ilike('month', `${currentMonth}%`)
+        .eq('status', 'unpaid')
         .single()
 
-      if (paymentData) {
+      if (matchingBill) {
         await supabase
           .from('payments')
           .update({
             status: 'paid',
             paid_at: new Date().toISOString(),
+            payment_method: 'cash',
             updated_at: new Date().toISOString()
           })
-          .eq('id', paymentData.id)
+          .eq('id', matchingBill.id)
       }
+
+      // Notify the employee that their cash payment was confirmed
+      await supabase.from('notifications').insert({
+        user_id: request.user_id,
+        type: 'payment_confirmed',
+        message: `Your cash payment of ৳${request.amount} has been confirmed by admin. Your bill is now marked as paid.`
+      })
 
       toast.success('Cash payment confirmed')
       fetchBills()

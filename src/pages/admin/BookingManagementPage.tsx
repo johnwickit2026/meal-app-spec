@@ -19,6 +19,9 @@ export function BookingManagementPage() {
   const [todaySchedules, setTodaySchedules] = useState<any[]>([])
   const [selectedUser, setSelectedUser] = useState('')
   const [selectedSchedule, setSelectedSchedule] = useState('')
+  const [selectedDate, setSelectedDate] = useState(
+    new Date().toISOString().split('T')[0]
+  )
   const [quantity, setQuantity] = useState(1)
   const [notes, setNotes] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -39,8 +42,21 @@ export function BookingManagementPage() {
     fetchAllBookings()
   }, [])
 
+  const fetchSchedulesForDate = async (date: string) => {
+    const { data } = await supabase
+      .from('menu_schedules')
+      .select('id, scheduled_date, time_slot, capacity, meal:meals(id, name)')
+      .eq('scheduled_date', date)
+      .eq('is_available', true)
+      .order('time_slot')
+    setTodaySchedules(data || [])
+  }
+
   const openManualModal = async () => {
     setIsModalOpen(true)
+    const today = new Date().toISOString().split('T')[0]
+    setSelectedDate(today)
+    setSelectedSchedule('')
     // Fetch users and schedules
     try {
       const { data: usersData } = await supabase
@@ -49,24 +65,9 @@ export function BookingManagementPage() {
         .eq('is_active', true)
         .eq('role', 'employee')
         .order('full_name')
-      
-      const today = new Date().toISOString().split('T')[0]
-      const { data: schedulesData } = await supabase
-        .from('menu_schedules')
-        .select(`
-          id,
-          scheduled_date,
-          time_slot,
-          capacity,
-          meal:meals (name)
-        `)
-        .gte('scheduled_date', today)
-        .eq('is_available', true)
-        .order('scheduled_date')
-        .order('time_slot')
 
       if (usersData) setActiveUsers(usersData)
-      if (schedulesData) setTodaySchedules(schedulesData)
+      await fetchSchedulesForDate(today)
     } catch (err) {
       console.error(err)
       toast.error('Failed to load data for manual order')
@@ -77,19 +78,8 @@ export function BookingManagementPage() {
     setIsGuestModalOpen(true)
     try {
       const today = new Date().toISOString().split('T')[0]
-      const { data: schedulesData } = await supabase
-        .from('menu_schedules')
-        .select(`
-          id,
-          scheduled_date,
-          time_slot,
-          meal:meals (id, name)
-        `)
-        .gte('scheduled_date', today)
-        .order('scheduled_date')
-        .order('time_slot')
-
-      if (schedulesData) setTodaySchedules(schedulesData)
+      setGuestForm(prev => ({ ...prev, meal_date: today, menu_schedule_id: '' }))
+      await fetchSchedulesForDate(today)
     } catch (err) {
       console.error(err)
       toast.error('Failed to load schedules for guest meal')
@@ -436,13 +426,28 @@ export function BookingManagementPage() {
           </div>
 
           <div>
+            <Input
+              type="date"
+              label="Select Date"
+              value={selectedDate}
+              min={new Date().toISOString().split('T')[0]}
+              onChange={(e) => {
+                setSelectedDate(e.target.value)
+                setSelectedSchedule('')
+                fetchSchedulesForDate(e.target.value)
+              }}
+              className="w-full"
+            />
+          </div>
+
+          <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Menu Schedule</label>
             <Select
               options={[
                 { value: '', label: 'Select a schedule...' },
                 ...todaySchedules.map(s => ({ 
                   value: s.id, 
-                  label: `${s.meal?.name || 'Meal'} on ${format(new Date(s.scheduled_date), 'MMM d')} at ${s.time_slot} (Cap: ${s.capacity})` 
+                  label: `${s.meal?.name || 'Meal'} at ${s.time_slot} (Cap: ${s.capacity})` 
                 }))
               ]}
               value={selectedSchedule}
@@ -525,13 +530,27 @@ export function BookingManagementPage() {
           </div>
 
           <div>
+            <Input
+              type="date"
+              label="Select Date"
+              value={guestForm.meal_date}
+              min={new Date().toISOString().split('T')[0]}
+              onChange={(e) => {
+                setGuestForm(prev => ({ ...prev, meal_date: e.target.value, menu_schedule_id: '' }))
+                fetchSchedulesForDate(e.target.value)
+              }}
+              className="w-full"
+            />
+          </div>
+
+          <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Menu Schedule</label>
             <Select
               options={[
                 { value: '', label: 'Select a schedule...' },
                 ...todaySchedules.map(s => ({ 
                   value: s.id, 
-                  label: `${s.meal?.name || 'Meal'} on ${format(new Date(s.scheduled_date), 'MMM d')} at ${s.time_slot}` 
+                  label: `${s.meal?.name || 'Meal'} at ${s.time_slot}` 
                 }))
               ]}
               value={guestForm.menu_schedule_id}

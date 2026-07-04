@@ -11,11 +11,13 @@ import {
   GraduationCap,
   CalendarDays,
   Wallet,
+  CreditCard,
 } from 'lucide-react'
 import { format } from 'date-fns'
 import toast from 'react-hot-toast'
 import { useAuthStore } from '../../store'
 import { useStudentStore } from '../../store/studentStore'
+import { supabase } from '../../lib/supabaseClient'
 import { getRoleBadgeClasses, getRoleDisplayName } from '../../lib/roles'
 import { cn } from '../../lib/utils'
 import { Card, CardContent, CardHeader, CardTitle, Button, Badge } from '../../components/ui'
@@ -23,16 +25,18 @@ import { Card, CardContent, CardHeader, CardTitle, Button, Badge } from '../../c
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 const STATUS_CONFIG = {
-  pending:   { label: 'Pending Payment', variant: 'pending'   as const, icon: Clock },
-  paid:      { label: 'Paid',            variant: 'confirmed' as const, icon: CheckCircle2 },
-  cancelled: { label: 'Cancelled',       variant: 'cancelled' as const, icon: AlertCircle },
-  delivered: { label: 'Delivered',       variant: 'success'   as const, icon: Package },
+  pending:   { label: 'Awaiting Admin Approval', variant: 'pending'   as const, icon: Clock },
+  confirmed: { label: 'Confirmed — Pay Now',     variant: 'warning'   as const, icon: CreditCard },
+  paid:      { label: 'Paid',                    variant: 'confirmed' as const, icon: CheckCircle2 },
+  cancelled: { label: 'Cancelled',               variant: 'cancelled' as const, icon: AlertCircle },
+  delivered: { label: 'Delivered',               variant: 'success'   as const, icon: Package },
 }
 
 // ─── Page ────────────────────────────────────────────────────────────────────
 
 export function StudentDashboardPage() {
-  const { profile } = useAuthStore()
+  const { profile, user } = useAuthStore()
+  const [studentBalance, setStudentBalance] = useState<number>(0)
   const {
     upcomingOrders,
     pastOrders,
@@ -65,6 +69,19 @@ export function StudentDashboardPage() {
     fetchOrders()
     fetchMenu()
   }, [fetchOrders, fetchMenu])
+
+  useEffect(() => {
+    const fetchBalance = async () => {
+      if (!user?.id) return
+      const { data: balanceData } = await supabase
+        .from('user_balances')
+        .select('balance')
+        .eq('user_id', user.id)
+        .single()
+      setStudentBalance(balanceData?.balance ?? 0)
+    }
+    fetchBalance()
+  }, [user?.id])
 
   const isInitialLoading = isLoadingOrders && upcomingOrders.length === 0
 
@@ -213,7 +230,7 @@ export function StudentDashboardPage() {
             </div>
             <div className="min-w-0">
               <p className="text-2xl font-bold text-emerald-700 leading-tight">
-                ৳{Number(profile?.balance || 0).toFixed(0)}
+                ৳{Number(studentBalance ?? 0).toFixed(0)}
               </p>
               <p className="text-sm text-emerald-600 leading-tight">Current Balance</p>
             </div>
@@ -263,15 +280,22 @@ export function StudentDashboardPage() {
                 </div>
 
                 {nextOrder.status === 'pending' && (
+                  <div className="flex items-center justify-center gap-2 p-3 bg-amber-50 rounded-lg text-amber-700">
+                    <Clock className="w-4 h-4" />
+                    <span className="text-sm font-medium">Awaiting Admin Approval</span>
+                  </div>
+                )}
+
+                {nextOrder.status === 'confirmed' && (
                   <div className="space-y-2">
                     <Button 
                       className="w-full bg-emerald-600 hover:bg-emerald-700 text-white border-0"
                       onClick={() => handlePayWithBalance(nextOrder.id)}
                       isLoading={isPayingWithBalance}
-                      disabled={isPayingWithBalance || (profile?.balance || 0) < nextOrder.total_amount}
+                      disabled={isPayingWithBalance || (studentBalance ?? 0) < nextOrder.total_amount}
                     >
                       <Wallet className="w-4 h-4 mr-2" />
-                      Pay with Balance (৳{Number(profile?.balance || 0).toFixed(0)})
+                      Pay with Balance (৳{Number(studentBalance ?? 0).toFixed(0)})
                     </Button>
                     <Link to={`/student/payment?order_id=${nextOrder.id}`} className="block">
                       <Button variant="outline" className="w-full text-amber-700 border-amber-200 hover:bg-amber-50">

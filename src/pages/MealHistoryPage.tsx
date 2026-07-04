@@ -23,6 +23,7 @@ interface MealHistoryItem {
   notes: string | null
   booked_at: string
   updated_at: string
+  price_at_booking: number | null
   user?: {
     id: string
     full_name: string
@@ -35,6 +36,7 @@ interface MealHistoryItem {
     description: string | null
     meal_type: string
     image_url: string | null
+    price?: number | null
   }
   schedule: {
     id: string
@@ -187,7 +189,7 @@ export function MealHistoryPage() {
 
   const totalSpent = filteredHistory
     .filter(item => item.status === 'confirmed')
-    .reduce((sum, item) => sum + (item.schedule?.price || 0), 0)
+    .reduce((sum, item) => sum + (item.price_at_booking ?? item.schedule?.price ?? 0), 0)
 
   const totalMeals = filteredHistory.filter(item => item.status === 'confirmed').length
 
@@ -201,7 +203,7 @@ export function MealHistoryPage() {
         item.user?.full_name || t('you'),
         item.user?.department || '-',
         item.status,
-        item.schedule?.price || 0
+        item.price_at_booking ?? item.schedule?.price ?? 0
       ].join(','))
     ].join('\n')
 
@@ -453,7 +455,7 @@ export function MealHistoryPage() {
                         </td>
                         <td className="px-4 py-3 text-right">
                           <p className="text-sm font-medium text-gray-900">
-                            {currencySymbol}{item.schedule?.price?.toFixed(2) || '0.00'}
+                            {currencySymbol}{(item.price_at_booking ?? item.schedule?.price ?? 0).toFixed(2)}
                           </p>
                           <p className="text-xs text-gray-500">
                             {format(parseISO(item.booked_at), 'MMM d, HH:mm')}

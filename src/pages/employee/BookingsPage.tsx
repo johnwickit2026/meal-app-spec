@@ -23,12 +23,27 @@ export function BookingsPage() {
   const [payNowModalOpen, setPayNowModalOpen] = useState(false)
   const [isSubmittingPayNow, setIsSubmittingPayNow] = useState(false)
 
+  const [userBalance, setUserBalance] = useState(0)
+  const [isPayingBalance, setIsPayingBalance] = useState(false)
+  const [payLaterModalOpen, setPayLaterModalOpen] = useState(false)
+  const [isSubmittingPayLater, setIsSubmittingPayLater] = useState(false)
+
   useEffect(() => {
     if (user) {
       fetchUserBookings(user.id, true) // Force refresh to get latest bookings
       fetchSettings()
+      fetchBalance(user.id)
     }
   }, [user, fetchUserBookings, fetchSettings])
+
+  const fetchBalance = async (userId: string) => {
+    const { data } = await supabase
+      .from('user_balances')
+      .select('balance')
+      .eq('user_id', userId)
+      .single()
+    setUserBalance(data?.balance ?? 0)
+  }
 
   // Calculate monthly total cost of confirmed bookings (accounting for quantity)
   const currentMonth = new Date().toISOString().slice(0, 7) // 'YYYY-MM'
@@ -87,6 +102,81 @@ export function BookingsPage() {
       toast.error('Failed to submit request: ' + err.message)
     } finally {
       setIsSubmittingPayNow(false)
+    }
+  }
+
+  const handlePayWithBalance = async () => {
+    const session = await supabase.auth.getSession()
+    const token = session.data.session?.access_token
+    setIsPayingBalance(true)
+    try {
+      const response = await fetch('/api/bookings-pay-balance', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ amount: monthlyTotal })
+      })
+      const result = await response.json()
+      if (result.success) {
+        toast.success('Paid with balance successfully!')
+        if (typeof result.newBalance === 'number') setUserBalance(result.newBalance)
+      } else {
+        toast.error(result.error || 'Payment failed')
+      }
+    } catch (err: any) {
+      toast.error('Payment failed: ' + err.message)
+    } finally {
+      setIsPayingBalance(false)
+    }
+  }
+
+  const handlePayLater = async () => {
+    if (!user || monthlyTotal <= 0) return
+    setIsSubmittingPayLater(true)
+    try {
+      const month = new Date().toISOString().slice(0, 7) // 'YYYY-MM'
+
+      // Record an unpaid bill flagged as pay_later
+      const { error } = await supabase.from('payments').upsert({
+        user_id: user.id,
+        month,
+        amount: monthlyTotal,
+        status: 'unpaid',
+        payment_method: 'pay_later',
+      }, { onConflict: 'user_id,month' })
+      if (error) throw error
+
+      // Notify every admin
+      const { data: admins } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('role', 'admin')
+
+      if (admins && admins.length > 0) {
+        const { data: submitterProfile } = await supabase
+          .from('profiles')
+          .select('full_name')
+          .eq('id', user.id)
+          .single()
+        const senderName = submitterProfile?.full_name || user.email || 'An employee'
+        await supabase.from('notifications').insert(
+          admins.map((admin) => ({
+            user_id: admin.id,
+            type: 'pay_later' as const,
+            message: `${senderName} chose to pay later for ৳${monthlyTotal.toFixed(0)}. Bill is due at end of month.`,
+            is_read: false,
+          }))
+        )
+      }
+
+      toast.success('Your bill will be due at the end of the month.')
+      setPayLaterModalOpen(false)
+    } catch (err: any) {
+      toast.error('Failed to submit: ' + err.message)
+    } finally {
+      setIsSubmittingPayLater(false)
     }
   }
 
@@ -171,10 +261,23 @@ export function BookingsPage() {
             <p className="text-sm font-medium text-primary-700">{t('monthlyTotal')}</p>
             <p className="text-xs text-primary-500">{t('confirmedBookings')}</p>
           </div>
-          <div className="flex items-center gap-4">
+          <div className="flex flex-wrap items-center gap-3">
             <p className="text-2xl font-bold text-primary-700">৳{monthlyTotal.toFixed(0)}</p>
+            {userBalance > 0 && (
+              <Button
+                variant="success"
+                onClick={handlePayWithBalance}
+                isLoading={isPayingBalance}
+                disabled={isPayingBalance || userBalance < monthlyTotal}
+              >
+                Pay with Balance (৳{userBalance.toFixed(0)})
+              </Button>
+            )}
             <Button variant="primary" onClick={() => setPayNowModalOpen(true)}>
               Pay Now (Cash)
+            </Button>
+            <Button variant="outline" onClick={() => setPayLaterModalOpen(true)}>
+              Pay Later
             </Button>
           </div>
         </div>
@@ -366,6 +469,24 @@ export function BookingsPage() {
         confirmText="Submit Request"
         variant="primary"
         isLoading={isSubmittingPayNow}
+      />
+
+      {/* Pay Later Modal */}
+      <ConfirmDialog
+        isOpen={payLaterModalOpen}
+        onClose={() => setPayLaterModalOpen(false)}
+        onConfirm={handlePayLater}
+        title="Pay Later"
+        message={
+          <div className="space-y-2">
+            <p className="text-gray-600 text-sm">
+              Your bill of <strong>৳{monthlyTotal.toFixed(0)}</strong> will be due at end of month. Admin will follow up for payment.
+            </p>
+          </div>
+        }
+        confirmText="Confirm Pay Later"
+        variant="primary"
+        isLoading={isSubmittingPayLater}
       />
     </div>
   )

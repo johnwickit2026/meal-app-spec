@@ -10,6 +10,9 @@ import {
   Calendar,
   Loader2,
   RefreshCw,
+  CheckCircle2,
+  XCircle,
+  Clock,
 } from 'lucide-react'
 import {
   Card,
@@ -74,6 +77,19 @@ interface RecentPayment {
   } | null
 }
 
+interface PendingOrder {
+  id: string
+  status: string
+  total_amount: number
+  created_at: string
+  student: { full_name: string; email: string } | null
+  tiffin_menu: {
+    scheduled_date: string
+    time_slot: string
+    meal: { name: string } | null
+  } | null
+}
+
 // ─── Constants ───────────────────────────────────────────────────────────────
 
 // Time slots are now free text instead of fixed options
@@ -103,6 +119,8 @@ export function StudentTiffinPage() {
   const [menuItems, setMenuItems] = useState<TiffinMenuItemWithOrders[]>([])
   const [stats, setStats] = useState<OrderStats>({ totalOrders: 0, totalRevenue: 0, pendingDeliveries: 0 })
   const [recentPayments, setRecentPayments] = useState<RecentPayment[]>([])
+  const [pendingOrders, setPendingOrders] = useState<PendingOrder[]>([])
+  const [processingOrderId, setProcessingOrderId] = useState<string | null>(null)
 
   // ── UI state ──
   const [isLoading, setIsLoading] = useState(true)
@@ -226,12 +244,97 @@ export function StudentTiffinPage() {
     }
   }, [])
 
+  const fetchPendingOrders = useCallback(async () => {
+    const { data } = await supabase
+      .from('student_orders')
+      .select(`
+        id, status, total_amount, created_at,
+        student:profiles!student_orders_student_id_fkey(
+          full_name, email
+        ),
+        tiffin_menu:student_tiffin_menu(
+          scheduled_date, time_slot,
+          meal:meals(name)
+        )
+      `)
+      .eq('status', 'pending')
+      .order('created_at', { ascending: false })
+    setPendingOrders((data || []) as unknown as PendingOrder[])
+  }, [])
+
+  const handleApproveOrder = async (order: PendingOrder) => {
+    setProcessingOrderId(order.id)
+    try {
+      const { error } = await supabase
+        .from('student_orders')
+        .update({ status: 'confirmed' })
+        .eq('id', order.id)
+      if (error) throw error
+
+      const mealName = order.tiffin_menu?.meal?.name || 'your tiffin'
+      const mealDate = order.tiffin_menu?.scheduled_date || ''
+      const studentId = await getStudentId(order)
+      if (studentId) {
+        await supabase.from('notifications').insert({
+          user_id: studentId,
+          type: 'order_confirmed',
+          message: `Your tiffin order for ${mealName} on ${mealDate} has been confirmed.`,
+        })
+      }
+      toast.success('Order approved')
+      fetchPendingOrders()
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to approve order')
+    } finally {
+      setProcessingOrderId(null)
+    }
+  }
+
+  const handleRejectOrder = async (order: PendingOrder) => {
+    setProcessingOrderId(order.id)
+    try {
+      const { error } = await supabase
+        .from('student_orders')
+        .update({ status: 'cancelled' })
+        .eq('id', order.id)
+      if (error) throw error
+
+      const mealName = order.tiffin_menu?.meal?.name || 'your tiffin'
+      const mealDate = order.tiffin_menu?.scheduled_date || ''
+      const studentId = await getStudentId(order)
+      if (studentId) {
+        await supabase.from('notifications').insert({
+          user_id: studentId,
+          type: 'order_rejected',
+          message: `Your tiffin order for ${mealName} on ${mealDate} was not approved.`,
+        })
+      }
+      toast.success('Order rejected')
+      fetchPendingOrders()
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to reject order')
+    } finally {
+      setProcessingOrderId(null)
+    }
+  }
+
+  // Resolve the student's user id for an order (needed for notifications)
+  const getStudentId = async (order: PendingOrder): Promise<string | null> => {
+    const { data } = await supabase
+      .from('student_orders')
+      .select('student_id')
+      .eq('id', order.id)
+      .single()
+    return data?.student_id ?? null
+  }
+
   // ─── Init ──────────────────────────────────────────────────────────────────
 
   useEffect(() => {
     fetchMeals()
     fetchStats()
     fetchRecentPayments()
+    fetchPendingOrders()
 
     // Real-time subscription for payments
     const channel = supabase
@@ -240,12 +343,15 @@ export function StudentTiffinPage() {
         fetchRecentPayments()
         fetchStats()
       })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'student_orders' }, () => {
+        fetchPendingOrders()
+      })
       .subscribe()
 
     return () => {
       supabase.removeChannel(channel)
     }
-  }, [fetchMeals, fetchStats, fetchRecentPayments])
+  }, [fetchMeals, fetchStats, fetchRecentPayments, fetchPendingOrders])
 
   useEffect(() => {
     fetchMenuItems(dateFilter)
@@ -387,7 +493,7 @@ export function StudentTiffinPage() {
         <div className="flex gap-2 flex-shrink-0">
           <Button
             variant="secondary"
-            onClick={() => { fetchMenuItems(dateFilter); fetchStats() }}
+            onClick={() => { fetchMenuItems(dateFilter); fetchStats(); fetchPendingOrders() }}
           >
             <RefreshCw className="h-4 w-4 mr-2" />
             Refresh
@@ -446,6 +552,74 @@ export function StudentTiffinPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* ── Pending Orders (awaiting admin approval) ── */}
+      <Card className={pendingOrders.length > 0 ? 'border-amber-200' : ''}>
+        <CardHeader>
+          <CardTitle className="text-lg flex items-center gap-2">
+            <Clock className="h-5 w-5 text-amber-600" />
+            Pending Orders ({pendingOrders.length})
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {pendingOrders.length === 0 ? (
+            <div className="text-center py-8 text-gray-500">
+              <CheckCircle2 className="h-12 w-12 mx-auto mb-3 text-gray-300" />
+              <p>No pending orders awaiting approval</p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b border-gray-200">
+                    <th className="px-4 py-3 text-left text-sm font-medium text-gray-500">Student</th>
+                    <th className="px-4 py-3 text-left text-sm font-medium text-gray-500">Meal</th>
+                    <th className="px-4 py-3 text-left text-sm font-medium text-gray-500">Date / Time</th>
+                    <th className="px-4 py-3 text-left text-sm font-medium text-gray-500">Amount</th>
+                    <th className="px-4 py-3 text-right text-sm font-medium text-gray-500">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {pendingOrders.map((order) => (
+                    <tr key={order.id} className="hover:bg-gray-50">
+                      <td className="px-4 py-3">
+                        <p className="text-sm font-medium text-gray-900">{order.student?.full_name || 'Unknown'}</p>
+                        <p className="text-xs text-gray-500">{order.student?.email}</p>
+                      </td>
+                      <td className="px-4 py-3 text-sm text-gray-900">{order.tiffin_menu?.meal?.name || '—'}</td>
+                      <td className="px-4 py-3 text-sm text-gray-600">
+                        {order.tiffin_menu?.scheduled_date}
+                        <span className="block text-xs text-gray-400">{order.tiffin_menu?.time_slot}</span>
+                      </td>
+                      <td className="px-4 py-3 text-sm font-medium text-gray-900">৳{Number(order.total_amount).toFixed(0)}</td>
+                      <td className="px-4 py-3 text-right">
+                        <div className="flex justify-end gap-2">
+                          <Button
+                            size="sm"
+                            variant="success"
+                            onClick={() => handleApproveOrder(order)}
+                            isLoading={processingOrderId === order.id}
+                          >
+                            <CheckCircle2 className="h-4 w-4 mr-1" /> Approve
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="danger"
+                            onClick={() => handleRejectOrder(order)}
+                            isLoading={processingOrderId === order.id}
+                          >
+                            <XCircle className="h-4 w-4 mr-1" /> Reject
+                          </Button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       {/* ── Recent Payments ── */}
       <Card>
