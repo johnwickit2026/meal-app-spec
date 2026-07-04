@@ -44,15 +44,17 @@ export const handler: Handler = async (event: HandlerEvent): Promise<any> => {
         body: JSON.stringify({ success: false, error: 'userId and valid amount required' }) }
     }
 
-    const { data: userProfile, error: fetchErr } = await supabaseAdmin
-      .from('profiles').select('balance').eq('id', userId).single()
-    if (fetchErr) throw fetchErr
+    // Credit the canonical user_balances table (and log to advance_payments)
+    const { error: rpcErr } = await supabaseAdmin.rpc('add_user_balance', {
+      p_user_id: userId,
+      p_amount: parseFloat(amount),
+      p_admin_id: user.id
+    })
+    if (rpcErr) throw rpcErr
 
-    const newBalance = (userProfile?.balance || 0) + parseFloat(amount)
-
-    const { error: updateErr } = await supabaseAdmin
-      .from('profiles').update({ balance: newBalance }).eq('id', userId)
-    if (updateErr) throw updateErr
+    const { data: balanceRow } = await supabaseAdmin
+      .from('user_balances').select('balance').eq('user_id', userId).single()
+    const newBalance = balanceRow?.balance ?? null
 
     await supabaseAdmin.from('notifications').insert({
       user_id: userId,
