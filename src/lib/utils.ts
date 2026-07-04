@@ -27,7 +27,7 @@ export function formatTime(time: string): string {
 }
 
 export function getMealDeadline(scheduledDate: string, timeSlot: string, deadlineHours: number): Date {
-  const match = timeSlot.match(/(\d{1,2}):(\d{2})\s*(AM|PM)?/i)
+  const match = timeSlot.match(/(\d{1,2}):(\d{2})(?::\d{2})?\s*(AM|PM)?/i)
   let hours = 23
   let minutes = 59
   if (match) {

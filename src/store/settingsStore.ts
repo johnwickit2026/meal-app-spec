@@ -102,24 +102,26 @@ export const useSettingsStore = create<SettingsState>((set) => ({
 
 import { getMealDeadline } from '../lib/utils'
 
-// Helper function to check if booking is still allowed
+// Helper function to check if booking is still allowed.
+// Bookings stay open right up until the meal time itself; the ordering
+// deadline is intentionally ignored so meals (incl. same-day) remain bookable.
 export function isBookingAllowed(
   scheduledDate: string,
   timeSlot: string,
-  orderingDeadlineHours: number
+  _orderingDeadlineHours: number
 ): boolean {
-  const cutoffTime = getMealDeadline(scheduledDate, timeSlot, orderingDeadlineHours)
+  const cutoffTime = getMealDeadline(scheduledDate, timeSlot, 0)
   return new Date() < cutoffTime
 }
 
-// Helper function to get remaining time for booking
+// Helper function to get remaining time for booking (counts down to meal time)
 export function getBookingTimeRemaining(
   scheduledDate: string,
   timeSlot: string,
-  orderingDeadlineHours: number
+  _orderingDeadlineHours: number
 ): { hours: number; minutes: number; totalMinutes: number; isExpired: boolean } {
   const now = new Date()
-  const cutoffTime = getMealDeadline(scheduledDate, timeSlot, orderingDeadlineHours)
+  const cutoffTime = getMealDeadline(scheduledDate, timeSlot, 0)
   
   const diffMs = cutoffTime.getTime() - now.getTime()
   const totalMinutes = Math.max(0, Math.floor(diffMs / (1000 * 60)))
