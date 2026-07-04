@@ -159,8 +159,13 @@ export const handler: Handler = async (event: HandlerEvent) => {
     }
 
     return res.status(405).json({ error: 'Method not allowed' })
-  } catch (error) {
+  } catch (error: any) {
     console.error('Routine API error:', error)
-    return res.status(500).json({ error: 'Internal server error' })
+    return res.status(500).json({
+      error: 'Internal server error',
+      detail: error?.message || String(error),
+      code: error?.code,
+      hint: error?.hint,
+    })
   }
 }

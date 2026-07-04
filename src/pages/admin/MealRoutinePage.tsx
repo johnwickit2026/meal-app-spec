@@ -35,7 +35,10 @@ export default function MealRoutinePage() {
       const response = await fetch('/api/admin/routines', {
         headers: { 'Authorization': `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}` }
       })
-      if (!response.ok) throw new Error('Failed to fetch routines')
+      if (!response.ok) {
+        const err = await response.json().catch(() => ({}))
+        throw new Error(err.detail || err.error || 'Failed to fetch routines')
+      }
       const data = await response.json()
       setRoutines(data)
     } catch (error) {
@@ -69,7 +72,10 @@ export default function MealRoutinePage() {
         })
       })
 
-      if (!response.ok) throw new Error('Failed to create routine')
+      if (!response.ok) {
+        const err = await response.json().catch(() => ({}))
+        throw new Error(err.detail || err.error || 'Failed to create routine')
+      }
       toast.success('Routine created successfully')
       setIsCreateOpen(false)
       setNewRoutine({ name: '', description: '', routine_type: 'weekly' })
