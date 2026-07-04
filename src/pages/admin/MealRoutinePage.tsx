@@ -112,7 +112,7 @@ export default function MealRoutinePage() {
   }
 
   const addRoutineItem = (dayValue: number) => {
-    const defaultTimeSlot = '12:00 PM'
+    const defaultTimeSlot = '12:00'
     setNewItems(prev => [
       ...prev,
       {
