@@ -107,7 +107,42 @@ export default defineConfig(({ mode }) => {
               return null
             }
 
-            const resolved = resolveApiFile(routeSegments, apiDir)
+            /**
+             * Flattened Netlify-compatible resolver.
+             * Every handler now lives at api/<segments-joined-with-dash>/index.ts
+             * (e.g. /api/student/menu → api/student-menu/index.ts,
+             *       /api/admin/users/balance → api/admin-users-balance/index.ts).
+             * Dynamic single-segment routes map to a "<prefix>-item" handler with
+             * the trailing segment exposed as params.id
+             * (e.g. /api/admin/student-menu/<uuid> → api/admin-student-menu-item/index.ts).
+             */
+            function resolveFlatApiFile(
+              segments: string[]
+            ): { filePath: string; params: Record<string, string> } | null {
+              if (segments.length === 0) return null
+
+              // a) Exact flat directory with index.ts
+              const flatName = segments.join('-')
+              const flatIndex = path.join(apiDir, flatName, 'index.ts')
+              if (fs.existsSync(flatIndex)) return { filePath: flatIndex, params: {} }
+
+              // b) Exact flat single file
+              const flatFile = path.join(apiDir, `${flatName}.ts`)
+              if (fs.existsSync(flatFile)) return { filePath: flatFile, params: {} }
+
+              // c) Dynamic leaf: treat last segment as :id, map to "<prefix>-item"
+              if (segments.length >= 2) {
+                const prefix = segments.slice(0, -1).join('-')
+                const id = segments[segments.length - 1]
+                const itemIndex = path.join(apiDir, `${prefix}-item`, 'index.ts')
+                if (fs.existsSync(itemIndex)) return { filePath: itemIndex, params: { id } }
+              }
+
+              return null
+            }
+
+            // Prefer the flattened structure; fall back to legacy nested resolution.
+            const resolved = resolveFlatApiFile(routeSegments) || resolveApiFile(routeSegments, apiDir)
 
             if (!resolved) {
               // No matching API file — pass through to Vite's asset/HMR handling

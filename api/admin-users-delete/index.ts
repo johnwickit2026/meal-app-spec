@@ -1,5 +1,5 @@
 import type { Handler, HandlerEvent } from '@netlify/functions'
-import { createReqRes } from '../../_netlify_shim.js'
+import { createReqRes } from '../_netlify_shim.js'
 import { createClient } from '@supabase/supabase-js'
 
 export const handler: Handler = async (event: HandlerEvent): Promise<any> => {

@@ -1,9 +1,9 @@
 import type { Handler, HandlerEvent } from '@netlify/functions'
-import { createReqRes } from '../../_netlify_shim.js'
+import { createReqRes } from '../_netlify_shim.js'
 import { createClient, SupabaseClient } from '@supabase/supabase-js'
 import { z } from 'zod'
-import { validateInput, maskEmail } from '../../_validation.js'
-import { checkRateLimit, RATE_LIMITS, getClientIP, logSecurityEvent } from '../../_security.js'
+import { validateInput, maskEmail } from '../_validation.js'
+import { checkRateLimit, RATE_LIMITS, getClientIP, logSecurityEvent } from '../_security.js'
 
 let supabase: SupabaseClient<any, any, any>
 
