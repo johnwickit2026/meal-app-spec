@@ -92,6 +92,7 @@ export interface Database {
           booking_time_limit: number
           ordering_deadline_hours: number
           price: number | null
+          routine_id: string | null
           created_at: string
         }
         Insert: {
@@ -104,6 +105,7 @@ export interface Database {
           booking_time_limit?: number
           ordering_deadline_hours?: number
           price?: number | null
+          routine_id?: string | null
           created_at?: string
         }
         Update: {
@@ -116,6 +118,7 @@ export interface Database {
           booking_time_limit?: number
           ordering_deadline_hours?: number
           price?: number | null
+          routine_id?: string | null
           created_at?: string
         }
         Relationships: [
@@ -416,6 +419,7 @@ export interface Database {
           price: number
           is_available: boolean
           ordering_deadline_hours: number
+          routine_id: string | null
           created_at: string
         }
         Insert: {
@@ -427,6 +431,7 @@ export interface Database {
           price?: number
           is_available?: boolean
           ordering_deadline_hours?: number
+          routine_id?: string | null
           created_at?: string
         }
         Update: {
@@ -438,6 +443,7 @@ export interface Database {
           price?: number
           is_available?: boolean
           ordering_deadline_hours?: number
+          routine_id?: string | null
           created_at?: string
         }
         Relationships: [
