@@ -115,7 +115,8 @@ export const handler: Handler = async (event: HandlerEvent) => {
             is_available: true,
             booking_time_limit: item.ordering_deadline_hours || 1,
             ordering_deadline_hours: item.ordering_deadline_hours || 1,
-            price: item.price || null
+            price: item.price || null,
+            routine_id: routineId
           })
         }
 
@@ -128,7 +129,8 @@ export const handler: Handler = async (event: HandlerEvent) => {
             capacity: item.capacity || 10,
             price: item.price || 0,
             is_available: true,
-            ordering_deadline_hours: item.ordering_deadline_hours || 1
+            ordering_deadline_hours: item.ordering_deadline_hours || 1,
+            routine_id: routineId
           })
         }
       }
