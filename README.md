@@ -2,7 +2,7 @@
 
 A full-stack web application for managing office meal bookings. Employees can browse daily menus and book meals, while admins can manage menus, approve/deny bookings, and view analytics reports.
 
-**🔗 Live Demo:** [https://meal-plan-chi.vercel.app](https://meal-plan-chi.vercel.app)
+**🔗 Live Demo:** [https://mealspec-test.netlify.app/](https://mealspec-test.netlify.app/)
 
 ---
 
