@@ -2,7 +2,7 @@ import { create } from 'zustand'
 import { supabase, setAuthStorage } from '../lib/supabaseClient'
 import { resolveProfileRole } from '../lib/roles'
 import type { Profile } from '../types'
-import type { User, Session } from '@supabase/supabase-js'
+import type { User, Session, RealtimeChannel } from '@supabase/supabase-js'
 
 export type ProfileWithBalance = Profile & { balance?: number }
 
@@ -45,7 +45,50 @@ interface SignUpData {
 
 let authSubscription: { unsubscribe: () => void } | null = null
 
-export const useAuthStore = create<AuthState>((set, get) => ({
+// Realtime subscription for the signed-in user's balance row. Kept at module
+// scope so it survives store re-renders and can be torn down on sign-out.
+let balanceChannel: RealtimeChannel | null = null
+let balanceChannelUserId: string | null = null
+
+function unsubscribeBalance() {
+  if (balanceChannel) {
+    supabase.removeChannel(balanceChannel)
+    balanceChannel = null
+    balanceChannelUserId = null
+  }
+}
+
+export const useAuthStore = create<AuthState>((set, get) => {
+  // Subscribe to live INSERT/UPDATE on the current user's user_balances row and
+  // reflect the new balance into profile.balance without a re-login/refresh.
+  const subscribeBalance = (userId: string) => {
+    if (balanceChannel && balanceChannelUserId === userId) return
+    unsubscribeBalance()
+    balanceChannelUserId = userId
+    balanceChannel = supabase
+      .channel(`user_balances:${userId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'user_balances',
+          filter: `user_id=eq.${userId}`,
+        },
+        (payload) => {
+          const newRow = payload.new as { balance?: number | null } | null
+          const nextBalance = newRow?.balance
+          if (typeof nextBalance !== 'number') return
+          const current = get().profile
+          if (current && current.balance !== nextBalance) {
+            set({ profile: { ...current, balance: nextBalance } })
+          }
+        }
+      )
+      .subscribe()
+  }
+
+  return {
   user: null,
   profile: null,
   session: null,
@@ -57,38 +100,40 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       // Cleanup previous listener to prevent duplicates
       authSubscription?.unsubscribe()
 
-      let { data: { session } } = await supabase.auth.getSession()
-      
-      if (session) {
-        // Proactive session refresh if expiring within 5 minutes (300 seconds)
-        const expiresAt = session.expires_at
-        if (expiresAt && expiresAt - Math.floor(Date.now() / 1000) < 300) {
-          const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession()
-          if (!refreshError && refreshData.session) {
-            session = refreshData.session
-          }
-        }
-      }
+      // Do NOT manually refresh here. autoRefreshToken + the Web Locks-based
+      // storage lock let a single tab drive refresh, avoiding refresh-token
+      // rotation races across tabs that previously caused false sign-outs.
+      const { data: { session } } = await supabase.auth.getSession()
 
       if (session?.user) {
         set({ user: session.user, session })
         await get().fetchProfile(session.user.id)
+        subscribeBalance(session.user.id)
       }
-      
-      // Listen for auth changes
+
+      // Listen for auth changes. Handle events explicitly so that transient
+      // null sessions (e.g. mid-refresh, or a failed refresh in another tab)
+      // never wipe the local user/profile — only an authoritative SIGNED_OUT
+      // clears them.
       const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, currentSession) => {
-        set({ user: currentSession?.user || null, session: currentSession })
-        
-        if (event === 'TOKEN_REFRESHED' && currentSession) {
-          // Token refresh triggers cookieStorageAdapter.setItem under the hood 
-          // which updates the cookie TTL properly using the isRememberMe logic.
+        if (event === 'SIGNED_OUT') {
+          unsubscribeBalance()
+          set({ user: null, profile: null, session: null })
+          return
         }
-        
+
         if (currentSession?.user) {
-          await get().fetchProfile(currentSession.user.id)
-        } else {
-          set({ profile: null })
+          const prevUserId = get().user?.id
+          set({ user: currentSession.user, session: currentSession })
+          // Only (re)fetch the profile when the user actually changes or we
+          // don't have one yet — token refreshes shouldn't churn the profile.
+          if (prevUserId !== currentSession.user.id || !get().profile) {
+            await get().fetchProfile(currentSession.user.id)
+          }
+          subscribeBalance(currentSession.user.id)
         }
+        // Any other event with a null session is treated as transient and is
+        // intentionally ignored to keep sessions stable across tabs.
       })
       authSubscription = subscription
     } catch (error) {
@@ -117,9 +162,12 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         // Block inactive (pending approval) users
         if (profile && !profile.is_active) {
           await supabase.auth.signOut()
+          unsubscribeBalance()
           set({ user: null, profile: null, session: null })
           return { error: new Error('Your account is pending admin approval.'), pendingApproval: true }
         }
+
+        subscribeBalance(data.user.id)
       }
 
       return { error: null }
@@ -158,6 +206,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   },
 
   signOut: async () => {
+    unsubscribeBalance()
     await supabase.auth.signOut()
     set({ user: null, profile: null, session: null })
   },
@@ -264,4 +313,5 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       set({ isLoading: false })
     }
   },
-}))
+  }
+})

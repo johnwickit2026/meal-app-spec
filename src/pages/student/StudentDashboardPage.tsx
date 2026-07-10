@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import {
   UtensilsCrossed,
@@ -10,14 +10,12 @@ import {
   Package,
   GraduationCap,
   CalendarDays,
-  Wallet,
   CreditCard,
+  Banknote,
 } from 'lucide-react'
 import { format } from 'date-fns'
-import toast from 'react-hot-toast'
 import { useAuthStore } from '../../store'
 import { useStudentStore } from '../../store/studentStore'
-import { supabase } from '../../lib/supabaseClient'
 import { getRoleBadgeClasses, getRoleDisplayName } from '../../lib/roles'
 import { cn } from '../../lib/utils'
 import { Card, CardContent, CardHeader, CardTitle, Button, Badge } from '../../components/ui'
@@ -35,8 +33,7 @@ const STATUS_CONFIG = {
 // ─── Page ────────────────────────────────────────────────────────────────────
 
 export function StudentDashboardPage() {
-  const { profile, user } = useAuthStore()
-  const [studentBalance, setStudentBalance] = useState<number>(0)
+  const { profile } = useAuthStore()
   const {
     upcomingOrders,
     pastOrders,
@@ -48,40 +45,12 @@ export function StudentDashboardPage() {
     menuError,
     fetchMenu,
     menuDate,
-    payWithBalance,
   } = useStudentStore()
-  const [isPayingWithBalance, setIsPayingWithBalance] = useState(false)
-
-  const handlePayWithBalance = async (orderId: string) => {
-    setIsPayingWithBalance(true)
-    try {
-      const result = await payWithBalance(orderId)
-      if (result.error) throw result.error
-      toast.success('Successfully paid with balance!')
-    } catch (error: any) {
-      toast.error('Failed to pay with balance: ' + error.message)
-    } finally {
-      setIsPayingWithBalance(false)
-    }
-  }
 
   useEffect(() => {
     fetchOrders()
     fetchMenu()
   }, [fetchOrders, fetchMenu])
-
-  useEffect(() => {
-    const fetchBalance = async () => {
-      if (!user?.id) return
-      const { data: balanceData } = await supabase
-        .from('user_balances')
-        .select('balance')
-        .eq('user_id', user.id)
-        .single()
-      setStudentBalance(balanceData?.balance ?? 0)
-    }
-    fetchBalance()
-  }, [user?.id])
 
   const isInitialLoading = isLoadingOrders && upcomingOrders.length === 0
 
@@ -221,21 +190,6 @@ export function StudentDashboardPage() {
             </div>
           </CardContent>
         </Card>
-
-        {/* Balance */}
-        <Card className="h-[104px] border-emerald-100 bg-emerald-50/50">
-          <CardContent className="flex items-center gap-4 py-4 h-full">
-            <div className="h-12 w-12 bg-emerald-100 rounded-xl flex items-center justify-center flex-shrink-0">
-              <Wallet className="h-6 w-6 text-emerald-600" />
-            </div>
-            <div className="min-w-0">
-              <p className="text-2xl font-bold text-emerald-700 leading-tight">
-                ৳{Number(studentBalance ?? 0).toFixed(0)}
-              </p>
-              <p className="text-sm text-emerald-600 leading-tight">Current Balance</p>
-            </div>
-          </CardContent>
-        </Card>
       </div>
 
       {/* Main content grid */}
@@ -288,18 +242,16 @@ export function StudentDashboardPage() {
 
                 {nextOrder.status === 'confirmed' && (
                   <div className="space-y-2">
-                    <Button 
-                      className="w-full bg-emerald-600 hover:bg-emerald-700 text-white border-0"
-                      onClick={() => handlePayWithBalance(nextOrder.id)}
-                      isLoading={isPayingWithBalance}
-                      disabled={isPayingWithBalance || (studentBalance ?? 0) < nextOrder.total_amount}
-                    >
-                      <Wallet className="w-4 h-4 mr-2" />
-                      Pay with Balance (৳{Number(studentBalance ?? 0).toFixed(0)})
-                    </Button>
+                    <Link to={`/student/payment?order_id=${nextOrder.id}`} className="block">
+                      <Button className="w-full bg-amber-500 hover:bg-amber-600 text-white border-0">
+                        <CreditCard className="w-4 h-4 mr-2" />
+                        Pay Now
+                      </Button>
+                    </Link>
                     <Link to={`/student/payment?order_id=${nextOrder.id}`} className="block">
                       <Button variant="outline" className="w-full text-amber-700 border-amber-200 hover:bg-amber-50">
-                        Pay with SSLCommerz
+                        <Banknote className="w-4 h-4 mr-2" />
+                        Pay on Campus
                       </Button>
                     </Link>
                   </div>

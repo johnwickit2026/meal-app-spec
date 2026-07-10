@@ -64,8 +64,13 @@ export const handler: Handler = async (event: HandlerEvent) => {
     }
 
     const amount = Number(req.body?.amount)
+    // Optional: deduct only this much from balance (default: full amount)
+    const balanceDeductAmount = Number(req.body?.balanceDeductAmount) || amount
     if (!amount || isNaN(amount) || amount <= 0) {
       return res.status(400).json({ error: 'Invalid amount' })
+    }
+    if (balanceDeductAmount <= 0 || balanceDeductAmount > amount) {
+      return res.status(400).json({ error: 'Invalid balanceDeductAmount' })
     }
 
     // Get user's current balance
@@ -80,14 +85,14 @@ export const handler: Handler = async (event: HandlerEvent) => {
     }
 
     const currentBalance = Number(balanceRow.balance)
-    if (currentBalance < amount) {
+    if (currentBalance < balanceDeductAmount) {
       return res.status(400).json({ error: 'Insufficient balance' })
     }
 
     // Deduct amount via RPC
     const { error: rpcError } = await supabase.rpc('deduct_user_balance', {
       p_user_id: user.id,
-      p_amount: amount,
+      p_amount: balanceDeductAmount,
     })
     if (rpcError) throw rpcError
 
@@ -108,9 +113,23 @@ export const handler: Handler = async (event: HandlerEvent) => {
           status: 'paid',
           paid_at: new Date().toISOString(),
           payment_method: 'balance',
+          balance_applied: balanceDeductAmount,
           updated_at: new Date().toISOString(),
-        })
+        } as any)
         .eq('id', matchingBill.id)
+    } else {
+      // No existing bill row — create one as paid
+      await supabase
+        .from('payments')
+        .upsert({
+          user_id: user.id,
+          month: currentMonth,
+          amount,
+          status: 'paid',
+          paid_at: new Date().toISOString(),
+          payment_method: 'balance',
+          balance_applied: balanceDeductAmount,
+        } as any, { onConflict: 'user_id,month' })
     }
 
     // Send confirmation notification to user
@@ -124,10 +143,10 @@ export const handler: Handler = async (event: HandlerEvent) => {
       userId: user.id,
       email: maskEmail(user.email || ''),
       severity: 'INFO',
-      details: { action: 'PAY_WITH_BALANCE', amount },
+      details: { action: 'PAY_WITH_BALANCE', amount, balanceDeducted: balanceDeductAmount },
     })
 
-    const newBalance = currentBalance - amount
+    const newBalance = currentBalance - balanceDeductAmount
     return res.status(200).json({ success: true, newBalance })
   } catch (error: any) {
     console.error('Pay with balance error:', error)

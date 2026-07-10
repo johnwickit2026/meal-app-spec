@@ -227,6 +227,28 @@ export function PaymentsPage() {
         .eq('id', request.id)
       if (reqError) throw reqError
 
+      // Credit the confirmed cash amount to the user's balance. Uses the admin
+      // balance endpoint (service-role add_user_balance) which writes to
+      // user_balances, so the change is pushed live to the user via realtime.
+      const { data: { session } } = await supabase.auth.getSession()
+      const token = session?.access_token
+      const balanceRes = await fetch('/api/admin/users/balance', {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          userId: request.user_id,
+          amount: request.amount,
+          note: 'Cash payment confirmed'
+        })
+      })
+      const balanceResult = await balanceRes.json().catch(() => ({}))
+      if (!balanceRes.ok) {
+        throw new Error(balanceResult.error || 'Failed to credit balance')
+      }
+
       // Find the matching unpaid bill for this user for the current month
       const currentMonth = format(new Date(), 'yyyy-MM')
       const { data: matchingBill } = await supabase

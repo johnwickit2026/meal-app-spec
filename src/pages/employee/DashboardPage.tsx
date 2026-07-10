@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { UtensilsCrossed, CalendarDays, Clock, ArrowRight, DollarSign, AlertCircle, TrendingUp, Wallet } from 'lucide-react'
+import { UtensilsCrossed, CalendarDays, Clock, ArrowRight, DollarSign, AlertCircle, TrendingUp, Wallet, Globe } from 'lucide-react'
 import { useAuthStore, useBookingStore, useMenuStore, useSettingsStore } from '../../store'
 import { Card, CardContent, CardHeader, CardTitle, Button, CardSkeleton } from '../../components/ui'
 import { useTranslation } from '../../hooks/useTranslation'
@@ -9,6 +9,12 @@ import { format, subMonths } from 'date-fns'
 import { supabase } from '../../lib/supabaseClient'
 import { getOptimizedImageUrl } from '../../lib/utils'
 import type { UserBalance } from '../../types'
+
+function computeAdjustedDue(dueAmount: number | null, balance: number | null | undefined): number | null {
+  if (dueAmount === null) return null
+  if (typeof balance === 'number' && balance > 0) return Math.max(0, dueAmount - balance)
+  return dueAmount
+}
 
 export function DashboardPage() {
   const { user, profile } = useAuthStore()
@@ -42,6 +48,46 @@ export function DashboardPage() {
     fetchSettings()
     fetchSchedules(today)
   }, [user, fetchUserBookings, fetchSchedules, fetchSettings, today])
+
+  // Live-refresh when the payments table changes for this user (e.g. IPN
+  // callback marks a bill paid, or admin confirms a cash request).
+  useEffect(() => {
+    if (!user?.id) return
+    const channel = supabase
+      .channel(`dashboard-payments-${user.id}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'payments', filter: `user_id=eq.${user.id}` },
+        () => {
+          fetchDueAmount(user.id)
+          fetchCostAnalysis(user.id)
+        }
+      )
+      .subscribe()
+    return () => { supabase.removeChannel(channel) }
+  }, [user?.id])
+
+  // Live-refresh the balance when the auth store's realtime subscription
+  // updates profile.balance (e.g. an admin top-up), without a page refresh.
+  useEffect(() => {
+    if (!user?.id || !advancePaymentEnabled) return
+    if (typeof profile?.balance !== 'number') return
+    let active = true
+    ;(async () => {
+      const { data, error } = await supabase
+        .from('user_balances')
+        .select('*')
+        .eq('user_id', user.id)
+        .maybeSingle()
+      if (!active || (error && error.code !== 'PGRST116')) return
+      const typed = data as UserBalance | null
+      setUserBalance(typed)
+      setAdjustedDueAmount(computeAdjustedDue(dueAmount, typed?.balance))
+    })()
+    return () => {
+      active = false
+    }
+  }, [profile?.balance, user?.id, advancePaymentEnabled, dueAmount])
 
   const fetchDueAmount = async (userId: string) => {
     setIsLoadingDue(true)
@@ -449,10 +495,28 @@ export function DashboardPage() {
                 )}
               </div>
               
-              <div className="pt-2">
+              <div className="pt-2 space-y-2">
+                {/* Option 1: Pay with Balance */}
+                {userBalance && userBalance.balance > 0 && (
+                  <Link to="/bookings">
+                    <Button variant="primary" className="w-full justify-center">
+                      <Wallet className="h-4 w-4 mr-2" />
+                      Pay with Balance (৳{userBalance.balance.toFixed(0)})
+                    </Button>
+                  </Link>
+                )}
+                {/* Option 2: Pay Now (SSLCommerz) */}
                 <Link to="/bookings">
-                  <Button variant="primary" className="w-full justify-center">
-                    Pay Now
+                  <Button variant="outline" className="w-full justify-center text-primary-700 border-primary-300 hover:bg-primary-50">
+                    <Globe className="h-4 w-4 mr-2" />
+                    Pay Now (Online)
+                  </Button>
+                </Link>
+                {/* Option 3: Pay Later */}
+                <Link to="/bookings">
+                  <Button variant="ghost" className="w-full justify-center text-amber-700 hover:bg-amber-50">
+                    <Clock className="h-4 w-4 mr-2" />
+                    Pay Later
                   </Button>
                 </Link>
               </div>

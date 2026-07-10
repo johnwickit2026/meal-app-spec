@@ -147,24 +147,24 @@ function OrderRow({ order, onCancel, cancelling }: OrderRowProps) {
 
           {/* Actions */}
           <div className="flex gap-2 pt-1">
-            {order.status === 'pending' && (
-              <>
-                <Link to={`/student/payment?order_id=${order.id}`} className="flex-1">
-                  <Button className="w-full bg-amber-500 hover:bg-amber-600 text-white border-0" size="sm">
-                    <CreditCard className="h-4 w-4 mr-2" />
-                    Pay Now
-                  </Button>
-                </Link>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={(e) => { e.stopPropagation(); onCancel(order.id) }}
-                  disabled={cancelling}
-                  className="text-red-600 hover:bg-red-50 hover:text-red-700"
-                >
-                  {cancelling ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Cancel'}
+            {order.status === 'confirmed' && (
+              <Link to={`/student/payment?order_id=${order.id}`} className="flex-1">
+                <Button className="w-full bg-amber-500 hover:bg-amber-600 text-white border-0" size="sm">
+                  <CreditCard className="h-4 w-4 mr-2" />
+                  Pay Now
                 </Button>
-              </>
+              </Link>
+            )}
+            {order.status === 'pending' && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={(e) => { e.stopPropagation(); onCancel(order.id) }}
+                disabled={cancelling}
+                className="text-red-600 hover:bg-red-50 hover:text-red-700"
+              >
+                {cancelling ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Cancel'}
+              </Button>
             )}
           </div>
         </div>
