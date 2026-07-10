@@ -12,8 +12,11 @@ import {
   Loader2,
   ArrowLeft,
   ExternalLink,
+  Globe,
+  Banknote,
 } from 'lucide-react'
 import { useStudentStore } from '../../store/studentStore'
+
 import type { StudentOrder } from '../../store/studentStore'
 import { Card, CardContent, CardHeader, CardTitle, Button, Badge } from '../../components/ui'
 import toast from 'react-hot-toast'
@@ -39,7 +42,7 @@ function PaymentReturnBanner({ status }: { status: string }) {
         <XCircle className="h-6 w-6 text-red-600 flex-shrink-0" />
         <div>
           <p className="font-semibold text-red-800">Payment Failed</p>
-          <p className="text-sm text-red-700">Your payment could not be processed. Please try again.</p>
+          <p className="text-sm text-red-700">Your payment could not be processed. Your balance was not charged. Please try again.</p>
         </div>
       </div>
     )
@@ -50,7 +53,7 @@ function PaymentReturnBanner({ status }: { status: string }) {
         <AlertCircle className="h-6 w-6 text-yellow-600 flex-shrink-0" />
         <div>
           <p className="font-semibold text-yellow-800">Payment Cancelled</p>
-          <p className="text-sm text-yellow-700">You cancelled the payment. Your order is still pending.</p>
+          <p className="text-sm text-yellow-700">You cancelled the payment. Your balance was not charged.</p>
         </div>
       </div>
     )
@@ -182,7 +185,8 @@ export function StudentPaymentPage() {
     }
   }, [order, returnStatus])
 
-  const handlePay = async () => {
+  // ── Pay online (SSLCommerz) ──
+  const handlePayOnline = async () => {
     if (!orderId) return
     setIsPaying(true)
 
@@ -199,6 +203,50 @@ export function StudentPaymentPage() {
       window.location.href = paymentUrl
     }
     // Don't reset isPaying — page will navigate away
+  }
+
+  // ── Pay on Campus (cash payment request) ──
+  const handlePayOnCampus = async () => {
+    if (!orderId || !order) return
+    setIsPaying(true)
+    try {
+      const { data: { user: currentUser } } = await supabase.auth.getUser()
+      if (!currentUser) throw new Error('Not authenticated')
+
+      // Create a cash payment request for the order
+      const { error } = await supabase.from('cash_payment_requests').insert({
+        user_id: currentUser.id,
+        amount: Number(order.total_amount),
+        notes: `Student tiffin order: ${orderId}`,
+      })
+      if (error) throw error
+
+      // Notify admins
+      const [{ data: admins }, { data: submitterProfile }] = await Promise.all([
+        supabase.from('profiles').select('id').eq('role', 'admin'),
+        supabase.from('profiles').select('full_name').eq('id', currentUser.id).single()
+      ])
+
+      const senderName = submitterProfile?.full_name || currentUser.email || 'A student'
+
+      if (admins && admins.length > 0) {
+        await supabase.from('notifications').insert(
+          admins.map((admin) => ({
+            user_id: admin.id,
+            type: 'cash_request' as const,
+            message: `${senderName} wants to pay ৳${Number(order.total_amount).toFixed(0)} on campus for their tiffin order. Please confirm.`,
+            is_read: false,
+          }))
+        )
+      }
+
+      toast.success('Pay on Campus request submitted! Admin will confirm your payment.')
+      fetchOrders()
+    } catch (err: any) {
+      toast.error('Failed to submit request: ' + err.message)
+    } finally {
+      setIsPaying(false)
+    }
   }
 
   // ── No order_id provided ──
@@ -264,7 +312,7 @@ export function StudentPaymentPage() {
         </CardContent>
       </Card>
 
-      {/* Pay button */}
+      {/* Pay options */}
       {order && (
         <Card className="border-amber-200 bg-gradient-to-br from-amber-50 to-orange-50">
           <CardContent className="p-5 space-y-4">
@@ -292,36 +340,69 @@ export function StudentPaymentPage() {
               </div>
             ) : (
               <>
-                {/* SSLCommerz branding note */}
-                <div className="flex items-center gap-2 text-xs text-gray-500">
-                  <ExternalLink className="h-3.5 w-3.5" />
-                  <span>You will be redirected to SSLCommerz secure payment gateway</span>
-                </div>
-
                 <div className="text-center">
                   <p className="text-3xl font-bold text-amber-600 mb-1">
-                    ৳{order ? Number(order.total_amount).toFixed(0) : '—'}
+                    ৳{Number(order.total_amount).toFixed(0)}
                   </p>
-                  <p className="text-xs text-gray-500">Bangladeshi Taka (BDT)</p>
+                  <p className="text-xs text-gray-500">
+                    Amount to pay
+                  </p>
                 </div>
 
-                <Button
-                  onClick={handlePay}
-                  disabled={isPaying}
-                  className="w-full bg-amber-500 hover:bg-amber-600 text-white border-0 h-12 text-base font-semibold shadow-md shadow-amber-200 disabled:opacity-60"
-                >
-                  {isPaying ? (
-                    <>
-                      <Loader2 className="h-5 w-5 mr-2 animate-spin" />
-                      Connecting to payment gateway…
-                    </>
-                  ) : (
-                    <>
-                      <CreditCard className="h-5 w-5 mr-2" />
-                      Pay with SSLCommerz
-                    </>
-                  )}
-                </Button>
+                {/* Two payment options: Pay Now (SSLCommerz) and Pay on Campus */}
+                <div className="space-y-3">
+                  <Button
+                    onClick={handlePayOnline}
+                    disabled={isPaying}
+                    className="w-full bg-amber-500 hover:bg-amber-600 text-white border-0 h-12 text-base font-semibold shadow-md shadow-amber-200 disabled:opacity-60"
+                  >
+                    {isPaying ? (
+                      <>
+                        <Loader2 className="h-5 w-5 mr-2 animate-spin" />
+                        Connecting to gateway…
+                      </>
+                    ) : (
+                      <>
+                        <Globe className="h-5 w-5 mr-2" />
+                        Pay Now — ৳{Number(order.total_amount).toFixed(0)}
+                      </>
+                    )}
+                  </Button>
+
+                  {/* SSLCommerz branding note */}
+                  <div className="flex items-center gap-2 text-xs text-gray-500">
+                    <ExternalLink className="h-3.5 w-3.5" />
+                    <span>You will be redirected to SSLCommerz secure payment gateway</span>
+                  </div>
+
+                  <div className="relative flex items-center py-1">
+                    <div className="flex-grow border-t border-amber-200"></div>
+                    <span className="mx-3 text-xs text-gray-400 font-medium">OR</span>
+                    <div className="flex-grow border-t border-amber-200"></div>
+                  </div>
+
+                  <Button
+                    onClick={handlePayOnCampus}
+                    disabled={isPaying}
+                    variant="outline"
+                    className="w-full h-12 text-base font-semibold text-amber-700 border-amber-300 hover:bg-amber-50 disabled:opacity-60"
+                  >
+                    {isPaying ? (
+                      <>
+                        <Loader2 className="h-5 w-5 mr-2 animate-spin" />
+                        Submitting…
+                      </>
+                    ) : (
+                      <>
+                        <Banknote className="h-5 w-5 mr-2" />
+                        Pay on Campus
+                      </>
+                    )}
+                  </Button>
+                  <p className="text-xs text-center text-gray-400">
+                    Pay at the campus counter. Admin will confirm your payment.
+                  </p>
+                </div>
 
                 <p className="text-xs text-center text-gray-400">
                   Secured by SSLCommerz · bKash · Nagad · Cards accepted

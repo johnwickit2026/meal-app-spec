@@ -180,7 +180,7 @@ export interface Database {
         Row: {
           id: string
           user_id: string
-          type: 'booking_confirmed' | 'booking_denied' | 'conflict' | 'reminder' | 'cancelled' | 'payment_success' | 'new_payment' | 'payment_pending' | 'cash_request' | 'balance_added' | 'payment_confirmed' | 'pay_later' | 'order_confirmed' | 'order_rejected'
+          type: 'booking_confirmed' | 'booking_denied' | 'conflict' | 'reminder' | 'cancelled' | 'payment_success' | 'new_payment' | 'payment_pending' | 'cash_request' | 'balance_added' | 'payment_confirmed' | 'cash_remainder' | 'order_confirmed' | 'order_rejected'
           message: string
           is_read: boolean
           created_at: string
@@ -188,7 +188,7 @@ export interface Database {
         Insert: {
           id?: string
           user_id: string
-          type: 'booking_confirmed' | 'booking_denied' | 'conflict' | 'reminder' | 'cancelled' | 'payment_success' | 'new_payment' | 'payment_pending' | 'cash_request' | 'balance_added' | 'payment_confirmed' | 'pay_later' | 'order_confirmed' | 'order_rejected'
+          type: 'booking_confirmed' | 'booking_denied' | 'conflict' | 'reminder' | 'cancelled' | 'payment_success' | 'new_payment' | 'payment_pending' | 'cash_request' | 'balance_added' | 'payment_confirmed' | 'cash_remainder' | 'order_confirmed' | 'order_rejected'
           message: string
           is_read?: boolean
           created_at?: string
@@ -196,7 +196,7 @@ export interface Database {
         Update: {
           id?: string
           user_id?: string
-          type?: 'booking_confirmed' | 'booking_denied' | 'conflict' | 'reminder' | 'cancelled' | 'payment_success' | 'new_payment' | 'payment_pending' | 'cash_request' | 'balance_added' | 'payment_confirmed' | 'pay_later' | 'order_confirmed' | 'order_rejected'
+          type?: 'booking_confirmed' | 'booking_denied' | 'conflict' | 'reminder' | 'cancelled' | 'payment_success' | 'new_payment' | 'payment_pending' | 'cash_request' | 'balance_added' | 'payment_confirmed' | 'cash_remainder' | 'order_confirmed' | 'order_rejected'
           message?: string
           is_read?: boolean
           created_at?: string
@@ -733,7 +733,7 @@ export interface Database {
     Enums: {
       booking_status: 'pending' | 'confirmed' | 'denied' | 'cancelled'
       meal_type: 'breakfast' | 'lunch'
-      notification_type: 'booking_confirmed' | 'booking_denied' | 'conflict' | 'reminder' | 'cancelled' | 'payment_success' | 'new_payment' | 'payment_pending' | 'cash_request' | 'balance_added' | 'payment_confirmed' | 'pay_later' | 'order_confirmed' | 'order_rejected'
+      notification_type: 'booking_confirmed' | 'booking_denied' | 'conflict' | 'reminder' | 'cancelled' | 'payment_success' | 'new_payment' | 'payment_pending' | 'cash_request' | 'balance_added' | 'payment_confirmed' | 'cash_remainder' | 'order_confirmed' | 'order_rejected'
       user_role: 'employee' | 'admin' | 'food_editor' | 'finance_editor' | 'student'
     }
     CompositeTypes: {

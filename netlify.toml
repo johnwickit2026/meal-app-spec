@@ -140,6 +140,11 @@
   to = "/.netlify/functions/bookings-pay-balance"
   status = 200
 
+[[redirects]]
+  from = "/api/bookings/initiate-payment"
+  to = "/.netlify/functions/bookings-initiate-payment"
+  status = 200
+
 # ── General API wildcard ──────────────────────────────────────────────────────
 [[redirects]]
   from = "/api/*"

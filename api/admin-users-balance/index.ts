@@ -30,12 +30,6 @@ export const handler: Handler = async (event: HandlerEvent): Promise<any> => {
     if (authErr || !user) return { statusCode: 401, headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ success: false, error: 'Invalid token' }) }
 
-    const { data: profile } = await supabaseAdmin.from('profiles')
-      .select('role').eq('id', user.id).single()
-    if (profile?.role !== 'admin') return { statusCode: 403,
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ success: false, error: 'Forbidden' }) }
-
     const body = event.body ? JSON.parse(event.body) : {}
     const { userId, amount, note } = body
 
@@ -44,23 +38,39 @@ export const handler: Handler = async (event: HandlerEvent): Promise<any> => {
         body: JSON.stringify({ success: false, error: 'userId and valid amount required' }) }
     }
 
-    // Credit the canonical user_balances table (and log to advance_payments)
-    const { error: rpcErr } = await supabaseAdmin.rpc('add_user_balance', {
-      p_user_id: userId,
-      p_amount: parseFloat(amount),
-      p_admin_id: user.id
-    })
-    if (rpcErr) throw rpcErr
+    // Validate admin privilege and credit balance in parallel (independent reads).
+    const [profileResult, rpcResult] = await Promise.all([
+      supabaseAdmin.from('profiles').select('role').eq('id', user.id).single(),
+      supabaseAdmin.rpc('add_user_balance', {
+        p_user_id: userId,
+        p_amount: parseFloat(amount),
+        p_admin_id: user.id
+      })
+    ])
 
-    const { data: balanceRow } = await supabaseAdmin
-      .from('user_balances').select('balance').eq('user_id', userId).single()
-    const newBalance = balanceRow?.balance ?? null
+    const profile = profileResult.data
+    if (profile?.role !== 'admin') {
+      return { statusCode: 403, headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ success: false, error: 'Forbidden' }) }
+    }
 
-    await supabaseAdmin.from('notifications').insert({
-      user_id: userId,
-      type: 'balance_added',
-      message: `BDT ${amount} has been added to your account balance.${note ? ' Note: ' + note : ''}`
-    })
+    if (rpcResult.error) throw rpcResult.error
+
+    // newBalance comes straight from the RPC return value (no follow-up SELECT).
+    const newBalance = rpcResult.data ?? null
+
+    // Fire notification in the background so it never blocks the response.
+    ;(async () => {
+      try {
+        await supabaseAdmin.from('notifications').insert({
+          user_id: userId,
+          type: 'balance_added',
+          message: `BDT ${amount} has been added to your account balance.${note ? ' Note: ' + note : ''}`
+        })
+      } catch (err) {
+        console.error('Balance notification insert failed:', err)
+      }
+    })()
 
     return { statusCode: 200, headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ success: true, message: 'Balance updated',

@@ -12,6 +12,7 @@ const MAX_APPROVED_USERS = parseInt(import.meta.env.VITE_MAX_APPROVED_USERS || '
 
 interface ProfileWithDue extends Profile {
   due_amount?: number
+  balance?: number
 }
 
 export function UserManagementPage() {
@@ -132,6 +133,20 @@ export function UserManagementPage() {
     const amount = Number(depositAmount)
     if (isNaN(amount) || amount <= 0) return
 
+    const previousBalance = (selectedUser as ProfileWithDue).balance ?? 0
+    const optimisticBalance = previousBalance + amount
+    const userId = selectedUser.id
+
+    // Optimistic UI: close modal immediately, update balance locally, toast success.
+    setUsers((prev) =>
+      prev.map((u) => (u.id === userId ? { ...u, balance: optimisticBalance } : u))
+    )
+    setBalanceModalOpen(false)
+    setDepositAmount('')
+    setDepositNote('')
+    setSelectedUser(null)
+    toast.success(`Successfully added ৳${amount} to ${selectedUser.full_name}'s balance.`)
+
     setIsProcessing(true)
     try {
       const { data: { session } } = await supabase.auth.getSession()
@@ -143,29 +158,40 @@ export function UserManagementPage() {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         },
-        body: JSON.stringify({ 
-          userId: selectedUser.id, 
-          amount, 
-          note: depositNote 
+        body: JSON.stringify({
+          userId,
+          amount,
+          note: depositNote
         })
       })
 
       const result = await response.json()
-      
+
       if (!response.ok) {
         throw new Error(result.error || 'Failed to add balance')
       }
 
-      toast.success(`Successfully added ৳${amount} to ${selectedUser.full_name}'s balance.`)
-      setBalanceModalOpen(false)
-      setDepositAmount('')
-      setDepositNote('')
-      fetchUsers()
+      // Reconcile with server response.
+      const serverBalance = result.data?.newBalance
+      if (typeof serverBalance === 'number') {
+        setUsers((prev) =>
+          prev.map((u) => (u.id === userId ? { ...u, balance: serverBalance } : u))
+        )
+      } else {
+        // Server didn't return a balance; refresh the list to be safe.
+        fetchUsers()
+      }
     } catch (err: any) {
+      // Roll back optimistic balance on failure and reopen the modal so the
+      // admin can retry without losing context.
+      setUsers((prev) =>
+        prev.map((u) => (u.id === userId ? { ...u, balance: previousBalance } : u))
+      )
+      setSelectedUser(selectedUser)
+      setBalanceModalOpen(true)
       toast.error('Failed to add balance: ' + err.message)
     } finally {
       setIsProcessing(false)
-      setSelectedUser(null)
     }
   }
 

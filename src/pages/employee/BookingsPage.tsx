@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
-import { CalendarDays, Calendar, Clock, User, Utensils, CreditCard } from 'lucide-react'
+import { useSearchParams } from 'react-router-dom'
+import { CalendarDays, Calendar, Clock, User, Utensils, CreditCard, Globe, CheckCircle2, Loader2, Wallet } from 'lucide-react'
 import { useAuthStore, useBookingStore, useSettingsStore } from '../../store'
 import { Card, CardContent, Select, CardSkeleton, Button } from '../../components/ui'
 import { BookingCard } from '../../components/employee'
@@ -9,32 +10,69 @@ import type { BookingWithDetails } from '../../types'
 import toast from 'react-hot-toast'
 import { supabase } from '../../lib/supabaseClient'
 
+type PaymentStatus = 'paid' | 'pending' | 'unpaid'
+
 export function BookingsPage() {
   const { user } = useAuthStore()
   const { bookings, fetchUserBookings, cancelBooking, isLoading } = useBookingStore()
   const { cancellationTimeLimit, fetchSettings } = useSettingsStore()
   const { t } = useTranslation()
   
+  const [searchParams] = useSearchParams()
+  const paymentReturnStatus = searchParams.get('payment_status') // success | fail | cancel
+
   const [statusFilter, setStatusFilter] = useState<string>('all')
   const [cancellingBookingId, setCancellingBookingId] = useState<string | null>(null)
   const [isCancelling, setIsCancelling] = useState(false)
   const [viewingBooking, setViewingBooking] = useState<BookingWithDetails | null>(null)
 
-  const [payNowModalOpen, setPayNowModalOpen] = useState(false)
-  const [isSubmittingPayNow, setIsSubmittingPayNow] = useState(false)
+  const [onlineModalOpen, setOnlineModalOpen] = useState(false)
+  const [isSubmitting, setIsSubmitting] = useState(false)
 
   const [userBalance, setUserBalance] = useState(0)
-  const [isPayingBalance, setIsPayingBalance] = useState(false)
-  const [payLaterModalOpen, setPayLaterModalOpen] = useState(false)
-  const [isSubmittingPayLater, setIsSubmittingPayLater] = useState(false)
+  const [paymentStatus, setPaymentStatus] = useState<PaymentStatus>('unpaid')
+  const [isLoadingPaymentStatus, setIsLoadingPaymentStatus] = useState(true)
+  const [pendingAmount, setPendingAmount] = useState<number | null>(null)
+
+  // Syncing banner state for return from SSLCommerz
+  const [isSyncingPayment, setIsSyncingPayment] = useState(false)
 
   useEffect(() => {
     if (user) {
-      fetchUserBookings(user.id, true) // Force refresh to get latest bookings
+      fetchUserBookings(user.id, true)
       fetchSettings()
       fetchBalance(user.id)
+      fetchPaymentStatus(user.id)
     }
   }, [user, fetchUserBookings, fetchSettings])
+
+  // Handle payment return from SSLCommerz
+  useEffect(() => {
+    if (!paymentReturnStatus || !user) return
+
+    if (paymentReturnStatus === 'success') {
+      setIsSyncingPayment(true)
+      toast.success('Payment received! Verifying...')
+      // Poll for status update (IPN may take a moment)
+      const interval = setInterval(() => {
+        fetchPaymentStatus(user.id).then(status => {
+          if (status === 'paid') {
+            setIsSyncingPayment(false)
+            toast.success('Payment confirmed!')
+            fetchBalance(user.id)
+            clearInterval(interval)
+          }
+        })
+      }, 3000)
+      // Stop polling after 30s
+      setTimeout(() => { clearInterval(interval); setIsSyncingPayment(false) }, 30000)
+      return () => clearInterval(interval)
+    } else if (paymentReturnStatus === 'fail') {
+      toast.error('Payment failed. Please try again.')
+    } else if (paymentReturnStatus === 'cancel') {
+      toast('Payment cancelled. Your balance was not charged.')
+    }
+  }, [paymentReturnStatus, user])
 
   const fetchBalance = async (userId: string) => {
     const { data } = await supabase
@@ -43,6 +81,51 @@ export function BookingsPage() {
       .eq('user_id', userId)
       .single()
     setUserBalance(data?.balance ?? 0)
+  }
+
+  const fetchPaymentStatus = async (userId: string): Promise<PaymentStatus> => {
+    setIsLoadingPaymentStatus(true)
+    const currentMonth = new Date().toISOString().slice(0, 7)
+    try {
+      // Check payments table for this month
+      const { data: paymentRow } = await supabase
+        .from('payments')
+        .select('status, amount')
+        .eq('user_id', userId)
+        .eq('month', currentMonth)
+        .maybeSingle()
+
+      if (paymentRow?.status === 'paid') {
+        setPaymentStatus('paid')
+        setPendingAmount(null)
+        return 'paid'
+      }
+
+      // Check pending cash requests for this month
+      const { data: cashReqs } = await supabase
+        .from('cash_payment_requests')
+        .select('amount, status, created_at')
+        .eq('user_id', userId)
+        .eq('status', 'pending')
+        .order('created_at', { ascending: false })
+        .limit(1)
+
+      if (cashReqs && cashReqs.length > 0) {
+        setPaymentStatus('pending')
+        setPendingAmount(cashReqs[0].amount)
+        return 'pending'
+      }
+
+      setPaymentStatus('unpaid')
+      setPendingAmount(null)
+      return 'unpaid'
+    } catch (err) {
+      console.error('Error fetching payment status:', err)
+      setPaymentStatus('unpaid')
+      return 'unpaid'
+    } finally {
+      setIsLoadingPaymentStatus(false)
+    }
   }
 
   // Calculate monthly total cost of confirmed bookings (accounting for quantity)
@@ -58,125 +141,81 @@ export function BookingsPage() {
       return sum + (price * quantity)
     }, 0)
 
-  const handleSubmitCashRequest = async () => {
+  // Auto-apply balance computation
+  const amountFromBalance = Math.min(userBalance, monthlyTotal)
+  const remainder = monthlyTotal - amountFromBalance
+
+  // ── Fully covered by balance ──────────────────────────────────────────
+  const handlePayFullyWithBalance = async () => {
     if (!user || monthlyTotal <= 0) return
-    setIsSubmittingPayNow(true)
+    setIsSubmitting(true)
     try {
-      // 1. Insert the cash payment request
-      const { error } = await supabase.from('cash_payment_requests').insert({
-        user_id: user.id,
-        amount: monthlyTotal,
-      })
-      if (error) throw error
-
-      // 2. Notify every admin user so the bell lights up immediately
-      const { data: admins } = await supabase
-        .from('profiles')
-        .select('id')
-        .eq('role', 'admin')
-
-      if (admins && admins.length > 0) {
-        // Resolve the submitter's display name from their profile
-        const { data: submitterProfile } = await supabase
-          .from('profiles')
-          .select('full_name')
-          .eq('id', user.id)
-          .single()
-
-        const senderName = submitterProfile?.full_name || user.email || 'An employee'
-        const notifMessage = `${senderName} submitted a cash payment request for ৳${monthlyTotal.toFixed(0)}. Please review in Payments.`
-
-        await supabase.from('notifications').insert(
-          admins.map((admin) => ({
-            user_id: admin.id,
-            type: 'cash_request' as const,
-            message: notifMessage,
-            is_read: false,
-          }))
-        )
-      }
-
-      toast.success('Payment request submitted. Admin will confirm.')
-      setPayNowModalOpen(false)
-    } catch (err: any) {
-      toast.error('Failed to submit request: ' + err.message)
-    } finally {
-      setIsSubmittingPayNow(false)
-    }
-  }
-
-  const handlePayWithBalance = async () => {
-    const session = await supabase.auth.getSession()
-    const token = session.data.session?.access_token
-    setIsPayingBalance(true)
-    try {
+      const session = await supabase.auth.getSession()
+      const token = session.data.session?.access_token
       const response = await fetch('/api/bookings-pay-balance', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({ amount: monthlyTotal })
+        body: JSON.stringify({
+          amount: monthlyTotal,
+          balanceDeductAmount: amountFromBalance
+        })
       })
       const result = await response.json()
       if (result.success) {
         toast.success('Paid with balance successfully!')
         if (typeof result.newBalance === 'number') setUserBalance(result.newBalance)
+        setPaymentStatus('paid')
       } else {
         toast.error(result.error || 'Payment failed')
       }
     } catch (err: any) {
       toast.error('Payment failed: ' + err.message)
     } finally {
-      setIsPayingBalance(false)
+      setIsSubmitting(false)
     }
   }
 
-  const handlePayLater = async () => {
+  // ── Pay Online (SSLCommerz) ───────────────────────────────────────────
+  const handlePayOnline = async () => {
     if (!user || monthlyTotal <= 0) return
-    setIsSubmittingPayLater(true)
+    setIsSubmitting(true)
     try {
-      const month = new Date().toISOString().slice(0, 7) // 'YYYY-MM'
-
-      // Record an unpaid bill flagged as pay_later
-      const { error } = await supabase.from('payments').upsert({
-        user_id: user.id,
-        month,
-        amount: monthlyTotal,
-        status: 'unpaid',
-        payment_method: 'pay_later',
-      }, { onConflict: 'user_id,month' })
-      if (error) throw error
-
-      // Notify every admin
-      const { data: admins } = await supabase
-        .from('profiles')
-        .select('id')
-        .eq('role', 'admin')
-
-      if (admins && admins.length > 0) {
-        const { data: submitterProfile } = await supabase
-          .from('profiles')
-          .select('full_name')
-          .eq('id', user.id)
-          .single()
-        const senderName = submitterProfile?.full_name || user.email || 'An employee'
-        await supabase.from('notifications').insert(
-          admins.map((admin) => ({
-            user_id: admin.id,
-            type: 'pay_later' as const,
-            message: `${senderName} chose to pay later for ৳${monthlyTotal.toFixed(0)}. Bill is due at end of month.`,
-            is_read: false,
-          }))
-        )
+      if (remainder <= 0) {
+        // Fully covered by balance — settle immediately
+        await handlePayFullyWithBalance()
+        setOnlineModalOpen(false)
+        return
       }
 
-      toast.success('Your bill will be due at the end of the month.')
-      setPayLaterModalOpen(false)
+      const session = await supabase.auth.getSession()
+      const token = session.data.session?.access_token
+      const response = await fetch('/api/bookings/initiate-payment', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          amount: remainder,
+          balanceAmount: amountFromBalance
+        })
+      })
+      const result = await response.json()
+      if (!response.ok) {
+        throw new Error(result.error || 'Failed to initiate payment')
+      }
+      if (result.payment_url) {
+        // Redirect to SSLCommerz gateway
+        window.location.href = result.payment_url
+        return // Don't reset isSubmitting — page will navigate away
+      }
     } catch (err: any) {
-      toast.error('Failed to submit: ' + err.message)
+      toast.error('Failed to initiate online payment: ' + err.message)
     } finally {
-      setIsSubmittingPayLater(false)
+      setIsSubmitting(false)
     }
   }
 
@@ -230,6 +269,10 @@ export function BookingsPage() {
     )
   }
 
+  const balanceSummaryText = amountFromBalance > 0 && monthlyTotal > 0
+    ? `৳${amountFromBalance.toFixed(0)} balance applied — you pay ৳${remainder.toFixed(0)}`
+    : null
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -254,32 +297,125 @@ export function BookingsPage() {
         />
       </div>
 
-      {/* Monthly Cost Summary */}
-      {monthlyTotal > 0 && (
-        <div className="bg-primary-50 border border-primary-200 rounded-xl px-5 py-4 flex items-center justify-between">
+      {/* Payment Syncing Banner (return from SSLCommerz) */}
+      {isSyncingPayment && (
+        <div className="flex items-center gap-3 p-4 bg-blue-50 border border-blue-200 rounded-xl">
+          <Loader2 className="h-6 w-6 text-blue-600 animate-spin flex-shrink-0" />
           <div>
-            <p className="text-sm font-medium text-primary-700">{t('monthlyTotal')}</p>
-            <p className="text-xs text-primary-500">{t('confirmedBookings')}</p>
+            <p className="font-semibold text-blue-800">Verifying Payment...</p>
+            <p className="text-sm text-blue-700">Please wait while we confirm with the payment gateway.</p>
           </div>
-          <div className="flex flex-wrap items-center gap-3">
+        </div>
+      )}
+
+      {/* Payment Return Status Banners */}
+      {paymentReturnStatus === 'success' && !isSyncingPayment && paymentStatus === 'paid' && (
+        <div className="flex items-center gap-3 p-4 bg-green-50 border border-green-200 rounded-xl">
+          <CheckCircle2 className="h-6 w-6 text-green-600 flex-shrink-0" />
+          <div>
+            <p className="font-semibold text-green-800">Payment Confirmed!</p>
+            <p className="text-sm text-green-700">Your meal payment has been processed successfully.</p>
+          </div>
+        </div>
+      )}
+      {paymentReturnStatus === 'fail' && (
+        <div className="flex items-center gap-3 p-4 bg-red-50 border border-red-200 rounded-xl">
+          <CreditCard className="h-6 w-6 text-red-600 flex-shrink-0" />
+          <div>
+            <p className="font-semibold text-red-800">Payment Failed</p>
+            <p className="text-sm text-red-700">Your payment could not be processed. Your balance was not charged. Please try again.</p>
+          </div>
+        </div>
+      )}
+      {paymentReturnStatus === 'cancel' && (
+        <div className="flex items-center gap-3 p-4 bg-yellow-50 border border-yellow-200 rounded-xl">
+          <CreditCard className="h-6 w-6 text-yellow-600 flex-shrink-0" />
+          <div>
+            <p className="font-semibold text-yellow-800">Payment Cancelled</p>
+            <p className="text-sm text-yellow-700">You cancelled the payment. Your balance was not charged.</p>
+          </div>
+        </div>
+      )}
+
+      {/* Monthly Cost Summary + Payment Options */}
+      {monthlyTotal > 0 && (
+        <div className="bg-primary-50 border border-primary-200 rounded-xl px-5 py-4 space-y-3">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-primary-700">{t('monthlyTotal')}</p>
+              <p className="text-xs text-primary-500">{t('confirmedBookings')}</p>
+            </div>
             <p className="text-2xl font-bold text-primary-700">৳{monthlyTotal.toFixed(0)}</p>
-            {userBalance > 0 && (
-              <Button
-                variant="success"
-                onClick={handlePayWithBalance}
-                isLoading={isPayingBalance}
-                disabled={isPayingBalance || userBalance < monthlyTotal}
-              >
-                Pay with Balance (৳{userBalance.toFixed(0)})
-              </Button>
-            )}
-            <Button variant="primary" onClick={() => setPayNowModalOpen(true)}>
-              Pay Now (Cash)
-            </Button>
-            <Button variant="outline" onClick={() => setPayLaterModalOpen(true)}>
-              Pay Later
-            </Button>
           </div>
+
+          {/* Balance summary line */}
+          {balanceSummaryText && paymentStatus === 'unpaid' && (
+            <div className="flex items-center gap-2 text-sm text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2">
+              <Wallet className="h-4 w-4 flex-shrink-0" />
+              <span>{balanceSummaryText}</span>
+            </div>
+          )}
+
+          {/* Payment Status Indicators */}
+          {paymentStatus === 'paid' && (
+            <div className="flex items-center gap-2 text-sm font-medium text-green-700 bg-green-50 border border-green-200 rounded-lg px-3 py-2">
+              <CheckCircle2 className="h-4 w-4 flex-shrink-0" />
+              <span>This month's bill is paid ✓</span>
+            </div>
+          )}
+
+          {paymentStatus === 'pending' && (
+            <div className="flex items-center gap-2 text-sm font-medium text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+              <Clock className="h-4 w-4 flex-shrink-0" />
+              <span>Pending admin confirmation{pendingAmount ? ` (৳${pendingAmount.toFixed(0)})` : ''}</span>
+            </div>
+          )}
+
+          {/* Three Payment Buttons — only show when unpaid */}
+          {paymentStatus === 'unpaid' && !isLoadingPaymentStatus && (
+            <div className="flex flex-wrap items-center gap-3 pt-1">
+              {/* Option 1: Pay with Balance */}
+              {userBalance > 0 && (
+                <Button
+                  variant="primary"
+                  onClick={() => {
+                    if (remainder <= 0) { handlePayFullyWithBalance(); return }
+                    handlePayFullyWithBalance()
+                  }}
+                  disabled={isSubmitting || userBalance < monthlyTotal}
+                  isLoading={isSubmitting}
+                  className="flex items-center gap-2"
+                >
+                  <Wallet className="h-4 w-4" />
+                  Pay with Balance (৳{userBalance.toFixed(0)})
+                </Button>
+              )}
+              {/* Option 2: Pay Now (SSLCommerz) */}
+              <Button
+                variant="outline"
+                onClick={() => {
+                  if (remainder <= 0) { handlePayFullyWithBalance(); return }
+                  setOnlineModalOpen(true)
+                }}
+                disabled={isSubmitting}
+                className="flex items-center gap-2 text-primary-700 border-primary-300 hover:bg-primary-50"
+              >
+                <Globe className="h-4 w-4" />
+                Pay Now (Online)
+              </Button>
+              {/* Option 3: Pay Later */}
+              <Button
+                variant="ghost"
+                onClick={() => {
+                  toast.success('You can pay later. Your due amount is shown above.')
+                }}
+                className="flex items-center gap-2 text-amber-700 hover:bg-amber-50"
+              >
+                <Clock className="h-4 w-4" />
+                Pay Later
+              </Button>
+            </div>
+          )}
         </div>
       )}
 
@@ -453,40 +589,33 @@ export function BookingsPage() {
         </Modal>
       )}
 
-      {/* Pay Now (Cash) Modal */}
-      <ConfirmDialog
-        isOpen={payNowModalOpen}
-        onClose={() => setPayNowModalOpen(false)}
-        onConfirm={handleSubmitCashRequest}
-        title="Submit Cash Payment Request"
-        message={
-          <div className="space-y-2">
-            <p className="text-gray-600 text-sm">
-              Submit a cash payment request for <strong>৳{monthlyTotal.toFixed(0)}</strong>? Admin will confirm receipt.
-            </p>
-          </div>
-        }
-        confirmText="Submit Request"
-        variant="primary"
-        isLoading={isSubmittingPayNow}
-      />
 
-      {/* Pay Later Modal */}
+
+      {/* Pay Online Modal */}
       <ConfirmDialog
-        isOpen={payLaterModalOpen}
-        onClose={() => setPayLaterModalOpen(false)}
-        onConfirm={handlePayLater}
-        title="Pay Later"
+        isOpen={onlineModalOpen}
+        onClose={() => setOnlineModalOpen(false)}
+        onConfirm={handlePayOnline}
+        title="Pay Now (Online)"
         message={
-          <div className="space-y-2">
+          <div className="space-y-3">
+            {amountFromBalance > 0 && (
+              <div className="flex items-center gap-2 text-sm text-emerald-700 bg-emerald-50 rounded-lg px-3 py-2">
+                <Wallet className="h-4 w-4 flex-shrink-0" />
+                <span>৳{amountFromBalance.toFixed(0)} will be applied from your balance</span>
+              </div>
+            )}
             <p className="text-gray-600 text-sm">
-              Your bill of <strong>৳{monthlyTotal.toFixed(0)}</strong> will be due at end of month. Admin will follow up for payment.
+              You will be redirected to SSLCommerz to pay <strong>৳{remainder.toFixed(0)}</strong> online.
+            </p>
+            <p className="text-xs text-gray-400">
+              Your balance will only be deducted after a successful payment. bKash · Nagad · Cards accepted.
             </p>
           </div>
         }
-        confirmText="Confirm Pay Later"
+        confirmText="Proceed to Payment"
         variant="primary"
-        isLoading={isSubmittingPayLater}
+        isLoading={isSubmitting}
       />
     </div>
   )
