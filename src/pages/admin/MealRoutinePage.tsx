@@ -309,8 +309,9 @@ export default function MealRoutinePage() {
                             {meals.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
                           </Select>
                           <div className="flex gap-2">
-                            <Input type="time" className="flex-1 sm:w-32" value={item.time_slot} onChange={e => updateRoutineItem(itemIdx, 'time_slot', e.target.value)} />
-                            <Select className="flex-1 sm:w-32" value={item.meal_type ?? 'both'} onChange={e => updateRoutineItem(itemIdx, 'meal_type', e.target.value)}>
+                            <Input type="time" className="flex-1 sm:w-28" value={item.time_slot} onChange={e => updateRoutineItem(itemIdx, 'time_slot', e.target.value)} />
+                            <Input type="number" min={0} title="Order deadline (hours before meal)" placeholder="Deadline hrs" className="flex-1 sm:w-24" value={item.ordering_deadline_hours ?? 1} onChange={e => updateRoutineItem(itemIdx, 'ordering_deadline_hours', e.target.value === '' ? 1 : Number(e.target.value))} />
+                            <Select className="flex-1 sm:w-28" value={item.meal_type ?? 'both'} onChange={e => updateRoutineItem(itemIdx, 'meal_type', e.target.value)}>
                               <option value="both">Both</option>
                               <option value="employee">Employee</option>
                               <option value="student">Student</option>
@@ -354,8 +355,9 @@ export default function MealRoutinePage() {
                       {meals.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
                     </Select>
                     <div className="flex gap-2">
-                      <Input type="time" className="flex-1 sm:w-32" value={item.time_slot} onChange={e => updateRoutineItem(itemIdx, 'time_slot', e.target.value)} />
-                      <Select className="flex-1 sm:w-32" value={item.meal_type ?? 'both'} onChange={e => updateRoutineItem(itemIdx, 'meal_type', e.target.value)}>
+                      <Input type="time" className="flex-1 sm:w-28" value={item.time_slot} onChange={e => updateRoutineItem(itemIdx, 'time_slot', e.target.value)} />
+                      <Input type="number" min={0} title="Order deadline (hours before meal)" placeholder="Deadline hrs" className="flex-1 sm:w-24" value={item.ordering_deadline_hours ?? 1} onChange={e => updateRoutineItem(itemIdx, 'ordering_deadline_hours', e.target.value === '' ? 1 : Number(e.target.value))} />
+                      <Select className="flex-1 sm:w-28" value={item.meal_type ?? 'both'} onChange={e => updateRoutineItem(itemIdx, 'meal_type', e.target.value)}>
                         <option value="both">Both</option>
                         <option value="employee">Employee</option>
                         <option value="student">Student</option>

@@ -202,7 +202,7 @@ function MenuSection({
               <div className="flex items-center gap-3 mb-3">
                 <div className="flex items-center gap-2 bg-amber-100 text-amber-700 px-3 py-1.5 rounded-lg">
                   <Clock className="h-4 w-4" />
-                  <span className="font-semibold text-sm">{slot}</span>
+                  <span className="font-semibold text-sm">{formatTime(slot)}</span>
                 </div>
                 <div className="flex-1 h-px bg-amber-100" />
                 <span className="text-xs text-gray-400">
