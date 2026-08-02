@@ -111,6 +111,9 @@ Derived from git history (commits from **2026-06-19** to **2026-07-11**).
 ### 🟢 2026-07-11 — System update v1
 - General **system update v1** (`11-7-2026 05:34`).
 
+### 🟢 2026-08-02 — UI Improvements for Meal Routines
+- Added descriptive field labels (Food Type, Time, Ordering Period, Category) above each input field in both the weekly and monthly meal routine item rows for better clarity.
+
 ### 🟢 2026-08-01 — Auto-approve orders, time formatting/filters, routine deadlines
 - **Auto-approve all orders:** employee meal bookings and student tiffin orders are now created directly as `confirmed` (no admin approval step).
   - New migration `026_auto_approve_all_orders.sql` rewrites `create_booking_atomic` to always confirm (capacity/duplicate-slot checks preserved).
