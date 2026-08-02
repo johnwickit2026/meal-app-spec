@@ -185,7 +185,7 @@ export const handler: Handler = async (event: HandlerEvent) => {
       .insert({
         user_id: user.id,
         menu_schedule_id,
-        status: 'pending',
+        status: 'confirmed',
         notes: notes,
         price_at_booking: schedule?.price ?? null,
       })
@@ -209,8 +209,8 @@ export const handler: Handler = async (event: HandlerEvent) => {
     // Create notification for the user
     await supabase.from('notifications').insert({
       user_id: user.id,
-      type: 'reminder',
-      message: `Your booking is pending approval.`,
+      type: 'order_confirmed',
+      message: `Your booking has been confirmed.`,
     })
 
     return res.status(201).json(newBooking)

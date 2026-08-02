@@ -304,17 +304,30 @@ export default function MealRoutinePage() {
                     </div>
                     <div className="space-y-3">
                       {newItems.map((item, itemIdx) => item.day_of_week === idx && (
-                        <div key={itemIdx} className="flex flex-col sm:flex-row sm:items-center gap-2 bg-white p-3 rounded shadow-sm border border-gray-100">
-                          <Select className="flex-1 w-full sm:w-auto" value={item.meal_id} onChange={e => updateRoutineItem(itemIdx, 'meal_id', e.target.value)}>
-                            {meals.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
-                          </Select>
-                          <div className="flex gap-2">
-                            <Input type="time" className="flex-1 sm:w-32" value={item.time_slot} onChange={e => updateRoutineItem(itemIdx, 'time_slot', e.target.value)} />
-                            <Select className="flex-1 sm:w-32" value={item.meal_type ?? 'both'} onChange={e => updateRoutineItem(itemIdx, 'meal_type', e.target.value)}>
-                              <option value="both">Both</option>
-                              <option value="employee">Employee</option>
-                              <option value="student">Student</option>
+                        <div key={itemIdx} className="flex flex-col sm:flex-row sm:items-end gap-2 bg-white p-3 rounded shadow-sm border border-gray-100">
+                          <div className="flex-1 w-full sm:w-auto space-y-1">
+                            <label className="text-xs font-medium text-gray-500">Food Type</label>
+                            <Select className="w-full" value={item.meal_id} onChange={e => updateRoutineItem(itemIdx, 'meal_id', e.target.value)}>
+                              {meals.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
                             </Select>
+                          </div>
+                          <div className="flex gap-2 items-end">
+                            <div className="flex-1 sm:w-28 space-y-1">
+                              <label className="text-xs font-medium text-gray-500">Time</label>
+                              <Input type="time" className="w-full" value={item.time_slot} onChange={e => updateRoutineItem(itemIdx, 'time_slot', e.target.value)} />
+                            </div>
+                            <div className="flex-1 sm:w-24 space-y-1">
+                              <label className="text-xs font-medium text-gray-500">Ordering Period (hrs)</label>
+                              <Input type="number" min={0} title="Order deadline (hours before meal)" placeholder="Deadline hrs" className="w-full" value={item.ordering_deadline_hours ?? 1} onChange={e => updateRoutineItem(itemIdx, 'ordering_deadline_hours', e.target.value === '' ? 1 : Number(e.target.value))} />
+                            </div>
+                            <div className="flex-1 sm:w-28 space-y-1">
+                              <label className="text-xs font-medium text-gray-500">Category</label>
+                              <Select className="w-full" value={item.meal_type ?? 'both'} onChange={e => updateRoutineItem(itemIdx, 'meal_type', e.target.value)}>
+                                <option value="both">Both</option>
+                                <option value="employee">Employee</option>
+                                <option value="student">Student</option>
+                              </Select>
+                            </div>
                             <Button variant="ghost" onClick={() => removeRoutineItem(itemIdx)} className="text-red-500 hover:bg-red-50 p-2 shrink-0"><Trash2 className="h-4 w-4"/></Button>
                           </div>
                         </div>
@@ -348,18 +361,31 @@ export default function MealRoutinePage() {
               <div className="mt-6 space-y-3">
                 <h4 className="font-medium text-gray-700">Monthly Meals Configured</h4>
                 {newItems.map((item, itemIdx) => (
-                  <div key={itemIdx} className="flex flex-col sm:flex-row sm:items-center gap-2 bg-white p-3 rounded shadow-sm border border-gray-200">
-                    <div className="w-full sm:w-16 font-semibold text-gray-700 text-sm">Day {item.day_of_month}</div>
-                    <Select className="flex-1 w-full sm:w-auto" value={item.meal_id} onChange={e => updateRoutineItem(itemIdx, 'meal_id', e.target.value)}>
-                      {meals.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
-                    </Select>
-                    <div className="flex gap-2">
-                      <Input type="time" className="flex-1 sm:w-32" value={item.time_slot} onChange={e => updateRoutineItem(itemIdx, 'time_slot', e.target.value)} />
-                      <Select className="flex-1 sm:w-32" value={item.meal_type ?? 'both'} onChange={e => updateRoutineItem(itemIdx, 'meal_type', e.target.value)}>
-                        <option value="both">Both</option>
-                        <option value="employee">Employee</option>
-                        <option value="student">Student</option>
+                  <div key={itemIdx} className="flex flex-col sm:flex-row sm:items-end gap-2 bg-white p-3 rounded shadow-sm border border-gray-200">
+                    <div className="w-full sm:w-16 font-semibold text-gray-700 text-sm self-center">Day {item.day_of_month}</div>
+                    <div className="flex-1 w-full sm:w-auto space-y-1">
+                      <label className="text-xs font-medium text-gray-500">Food Type</label>
+                      <Select className="w-full" value={item.meal_id} onChange={e => updateRoutineItem(itemIdx, 'meal_id', e.target.value)}>
+                        {meals.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
                       </Select>
+                    </div>
+                    <div className="flex gap-2 items-end">
+                      <div className="flex-1 sm:w-28 space-y-1">
+                        <label className="text-xs font-medium text-gray-500">Time</label>
+                        <Input type="time" className="w-full" value={item.time_slot} onChange={e => updateRoutineItem(itemIdx, 'time_slot', e.target.value)} />
+                      </div>
+                      <div className="flex-1 sm:w-24 space-y-1">
+                        <label className="text-xs font-medium text-gray-500">Ordering Period (hrs)</label>
+                        <Input type="number" min={0} title="Order deadline (hours before meal)" placeholder="Deadline hrs" className="w-full" value={item.ordering_deadline_hours ?? 1} onChange={e => updateRoutineItem(itemIdx, 'ordering_deadline_hours', e.target.value === '' ? 1 : Number(e.target.value))} />
+                      </div>
+                      <div className="flex-1 sm:w-28 space-y-1">
+                        <label className="text-xs font-medium text-gray-500">Category</label>
+                        <Select className="w-full" value={item.meal_type ?? 'both'} onChange={e => updateRoutineItem(itemIdx, 'meal_type', e.target.value)}>
+                          <option value="both">Both</option>
+                          <option value="employee">Employee</option>
+                          <option value="student">Student</option>
+                        </Select>
+                      </div>
                       <Button variant="ghost" onClick={() => removeRoutineItem(itemIdx)} className="text-red-500 hover:bg-red-50 p-2 shrink-0"><Trash2 className="h-4 w-4"/></Button>
                     </div>
                   </div>

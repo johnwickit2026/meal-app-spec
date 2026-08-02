@@ -7,6 +7,7 @@ import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { format } from 'date-fns'
+import { formatTime } from '../../lib/utils'
 import toast from 'react-hot-toast'
 
 const mealSchema = z.object({
@@ -29,6 +30,7 @@ export function MenuManagementPage() {
   const [editingMeal, setEditingMeal] = useState<Meal | null>(null)
   const [editingSchedule, setEditingSchedule] = useState<(MenuSchedule & { meal: Meal }) | null>(null)
   const [activeTab, setActiveTab] = useState<'meals' | 'schedules'>('meals')
+  const [timeFilter, setTimeFilter] = useState<string>('all')
 
   const mealForm = useForm({
     resolver: zodResolver(mealSchema),
@@ -350,16 +352,29 @@ export function MenuManagementPage() {
       {/* Schedules Tab */}
       {activeTab === 'schedules' && (
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between">
+          <CardHeader className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <CardTitle>Upcoming Schedules</CardTitle>
-            <Button onClick={() => {
-              setEditingSchedule(null)
-              scheduleForm.reset({ capacity: 10, ordering_deadline_hours: 1, price: null })
-              setIsScheduleModalOpen(true)
-            }}>
-              <Plus className="h-4 w-4 mr-2" />
-              Add Schedule
-            </Button>
+            <div className="flex items-center gap-2">
+              <Select
+                className="w-40"
+                value={timeFilter}
+                onChange={(e) => setTimeFilter(e.target.value)}
+                options={[
+                  { value: 'all', label: 'All times' },
+                  ...Array.from(new Set(schedules.map((s) => s.time_slot)))
+                    .sort()
+                    .map((t) => ({ value: t, label: formatTime(t) })),
+                ]}
+              />
+              <Button onClick={() => {
+                setEditingSchedule(null)
+                scheduleForm.reset({ capacity: 10, ordering_deadline_hours: 1, price: null })
+                setIsScheduleModalOpen(true)
+              }}>
+                <Plus className="h-4 w-4 mr-2" />
+                Add Schedule
+              </Button>
+            </div>
           </CardHeader>
           <CardContent>
             {schedules.length === 0 ? (
@@ -381,7 +396,9 @@ export function MenuManagementPage() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
-                    {schedules.map((schedule) => (
+                    {schedules
+                      .filter((s) => timeFilter === 'all' || s.time_slot === timeFilter)
+                      .map((schedule) => (
                       <tr key={schedule.id} className="hover:bg-gray-50">
                         <td className="px-4 py-3">
                           <p className="font-medium text-gray-900">{schedule.meal?.name}</p>
@@ -390,7 +407,7 @@ export function MenuManagementPage() {
                         <td className="px-4 py-3 text-gray-600">
                           {format(new Date(schedule.scheduled_date), 'MMM d, yyyy')}
                         </td>
-                        <td className="px-4 py-3 text-gray-600">{schedule.time_slot}</td>
+                        <td className="px-4 py-3 text-gray-600">{formatTime(schedule.time_slot)}</td>
                         <td className="px-4 py-3 text-gray-600">{schedule.capacity}</td>
                         <td className="px-4 py-3 text-gray-600">
                           {schedule.price ? `৳${schedule.price}` : (schedule.meal?.price ? `৳${schedule.meal.price}` : 'Free')}
@@ -502,8 +519,8 @@ export function MenuManagementPage() {
               {...scheduleForm.register('scheduled_date')}
             />
             <Input
-              label="Time Slot (e.g. 8:30 AM, Sehri)"
-              placeholder="Enter meal time"
+              label="Time Slot"
+              type="time"
               error={scheduleForm.formState.errors.time_slot?.message}
               {...scheduleForm.register('time_slot')}
             />

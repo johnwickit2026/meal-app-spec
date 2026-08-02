@@ -217,13 +217,13 @@ export const handler: Handler = async (event: HandlerEvent) => {
 
     const totalAmount = parseFloat(menuItem.price) * quantity
 
-    // Create the order
+    // Create the order — auto-approved (confirmed) immediately, no admin approval needed.
     const { data: newOrder, error: createError } = await supabase
       .from('student_orders')
       .insert({
         student_id: user.id,
         tiffin_menu_id,
-        status: 'pending',
+        status: 'confirmed',
         quantity,
         total_amount: totalAmount,
         order_date: today,
@@ -234,6 +234,13 @@ export const handler: Handler = async (event: HandlerEvent) => {
       .single()
 
     if (createError) throw createError
+
+    // Notify the student that their order was auto-confirmed.
+    await supabase.from('notifications').insert({
+      user_id: user.id,
+      type: 'order_confirmed',
+      message: `Your tiffin order has been confirmed. Please complete payment to secure your slot.`,
+    })
 
     logSecurityEvent('ADMIN_ACTION', req, {
       userId: user.id,

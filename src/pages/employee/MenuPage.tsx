@@ -6,6 +6,7 @@ import { Card, Button, Select, CardSkeleton } from '../../components/ui'
 import { useTranslation } from '../../hooks/useTranslation'
 import { MealCard } from '../../components/employee'
 import { Modal } from '../../components/ui/Modal'
+import { formatTime } from '../../lib/utils'
 import toast from 'react-hot-toast'
 
 export function MenuPage() {
@@ -16,6 +17,7 @@ export function MenuPage() {
   
   const [selectedDate, setSelectedDate] = useState(new Date())
   const [mealTypeFilter, setMealTypeFilter] = useState<string>('all')
+  const [timeFilter, setTimeFilter] = useState<string>('all')
   const [bookingScheduleId, setBookingScheduleId] = useState<string | null>(null)
   const [bookingQuantity, setBookingQuantity] = useState<number>(1)
   const [isBooking, setIsBooking] = useState(false)
@@ -59,9 +61,12 @@ export function MenuPage() {
   // Get selected schedule details for the dialog
   const selectedSchedule = schedules.find(s => s.id === bookingScheduleId)
 
+  const timeOptions = Array.from(new Set(schedules.map((s) => s.time_slot))).sort()
+
   const filteredSchedules = schedules.filter((schedule) => {
-    if (mealTypeFilter === 'all') return true
-    return schedule.meal?.meal_type === mealTypeFilter
+    const matchesType = mealTypeFilter === 'all' || schedule.meal?.meal_type === mealTypeFilter
+    const matchesTime = timeFilter === 'all' || schedule.time_slot === timeFilter
+    return matchesType && matchesTime
   })
 
   const breakfastSchedules = filteredSchedules.filter((s) => s.meal?.meal_type === 'breakfast')
@@ -102,7 +107,16 @@ export function MenuPage() {
             ]}
             value={mealTypeFilter}
             onChange={(e) => setMealTypeFilter(e.target.value)}
-            className="w-48"
+            className="w-40"
+          />
+          <Select
+            options={[
+              { value: 'all', label: 'All times' },
+              ...timeOptions.map((tm) => ({ value: tm, label: formatTime(tm) })),
+            ]}
+            value={timeFilter}
+            onChange={(e) => setTimeFilter(e.target.value)}
+            className="w-40"
           />
         </div>
       </div>
@@ -370,7 +384,7 @@ export function MenuPage() {
             <div className="bg-primary-50 rounded-lg p-3">
               <p className="font-medium text-gray-900">{selectedSchedule.meal?.name}</p>
               <p className="text-sm text-gray-500">
-                {selectedSchedule.scheduled_date} · {selectedSchedule.time_slot}
+                {selectedSchedule.scheduled_date} · {formatTime(selectedSchedule.time_slot)}
               </p>
             </div>
           )}
